@@ -3,6 +3,14 @@
  * Handles the floating UI, Drag & Drop, and messaging.
  */
 
+if (window.hasRunFloatingPanel) {
+    // Already running, just ensure listeners might stay active (they persist).
+    // Actually if we re-inject, we don't want to re-add listeners if they are already there.
+    // Return early.
+    throw new Error("Script already running"); // throw to stop execution or just return
+}
+window.hasRunFloatingPanel = true;
+
 let overlayContainer = null;
 let shadowRoot = null;
 let panel = null;
