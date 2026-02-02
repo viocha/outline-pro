@@ -129,9 +129,7 @@ async function createPanelUI() {
         <!-- Switch Action (moved to left) -->
         <button class="icon-btn" id="switch-dock-btn" title="切换到侧边栏">
            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
-              <path d="M4 1h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H4z"/>
-              <path d="M5 12h5v-1H5v1zm0-2h5V9H5v1zm0-2h5V7H5v1zm0-2h5V5H5v1z"/>
-              <!-- Sidebar like icon -->
+              <path d="M14 2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h12zM2 3v10h9V3H2zm10 0v10h2V3h-2z"/>
            </svg>
         </button>
 
