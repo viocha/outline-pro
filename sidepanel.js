@@ -236,14 +236,23 @@ if (switchModeBtn) {
         action: "SWITCH_TO_FLOATING",
         tabId: currentTabId
       });
-      // Close window if possible (standard way is just leaving it to the user or if we can close it)
-      // Note: window.close() on side panel script might work.
+      // Close window if possible
       window.close();
     } catch (e) {
       console.error("Switch failed", e);
     }
   });
 }
+
+// Listen for close command
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.action === "CLOSE_SIDEPANEL") {
+    window.close();
+  }
+});
+
+// Notify that sidepanel is open (to close floating)
+chrome.runtime.sendMessage({ action: "SIDEPANEL_OPENED" }).catch(() => { });
 
 // 启动
 refreshTOC();

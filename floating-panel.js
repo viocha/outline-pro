@@ -22,6 +22,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         showPanel();
     } else if (msg.action === "HIDE_FLOATING_PANEL") {
         hidePanel();
+    } else if (msg.action === "TOGGLE_FLOATING_PANEL") {
+        if (overlayContainer && overlayContainer.style.display !== 'none') {
+            hidePanel();
+        } else {
+            showPanel();
+        }
     }
 });
 

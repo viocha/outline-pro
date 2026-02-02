@@ -38,12 +38,22 @@
    },
    "manifest_version": 3,
    "name": "Outline Pro",
+   "description": "Smart outline generator with Sidebar and Floating modes for easy navigation.",
    "permissions": [
       "sidePanel",
-      "scripting"
+      "scripting",
+      "contextMenus"
    ],
+   "commands": {
+      "toggle-floating-outline": {
+         "suggested_key": {
+            "default": "Alt+Q"
+         },
+         "description": "Toggle Floating Outline"
+      }
+   },
    "side_panel": {
       "default_path": "sidepanel.html"
    },
-   "version": "1.2"
+   "version": "1.3"
 }
