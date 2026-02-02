@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { --primary-color: #007bff; --bg-hover: #f0f7ff; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #fff;
+      color: #333;
+    }
+
+    /* 浮动刷新按钮样式 */
+    #refresh-btn {
+      position: fixed;
+      top: 10px;
+      right: 20px;
+      z-index: 100;
+      font-size: 13px;
+      color: var(--primary-color);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      border-radius: 20px; /* 圆角矩形外观 */
+      background: rgba(255, 255, 255, 0.9); /* 半透明背景 */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12); /* 添加阴影提升辨识度 */
+      backdrop-filter: blur(4px); /* 背景模糊效果 */
+      border: 1px solid #eee;
+      transition: all 0.2s;
+    }
+
+    #refresh-btn:hover {
+      background: var(--bg-hover);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    #refresh-btn.loading .icon { animation: rotate 0.8s linear infinite; }
+    @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* 内容容器 */
+    #toc-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 4px 10px 4px;
+    }
+
+    .toc-item {
+      user-select: none; /* 防止频繁点击导致侧栏文字被选中 */
+      cursor: pointer; padding: 2px 6px;
+      font-size: 13.5px; border-radius: 6px; line-height: 1.3;
+      transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .toc-item:hover { background: var(--bg-hover); color: var(--primary-color); }
+    .h1 { font-weight: 600; font-size: 14.5px; }
+    .h2 { font-size: 13.5px; }
+    .h3 { font-size: 13px; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <a href="#" id="refresh-btn"><span class="icon">↻</span> 刷新</a>
+
+  <div id="toc-container">正在扫描网页标题...</div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
