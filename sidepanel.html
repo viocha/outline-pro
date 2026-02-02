@@ -3,268 +3,22 @@
 
 <head>
   <meta charset="utf-8">
-  <style>
-    :root {
-      --primary-color: #007bff;
-      --bg-hover: #f0f7ff;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      background: #fff;
-      overscroll-behavior: none;
-      /* 禁用橡皮筋效果 */
-    }
-
-    /* Header 样式 */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid #eee;
-      background: #fff;
-      flex-shrink: 0;
-      height: 36px;
-      box-sizing: border-box;
-    }
-
-    .header-title {
-      font-weight: 600;
-      font-size: 14px;
-      color: #333;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .icon-btn {
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      border: none;
-      background: transparent;
-      color: #666;
-      cursor: pointer;
-      transition: all 0.2s;
-      padding: 0;
-    }
-
-    .icon-btn:hover {
-      background: var(--bg-hover);
-      color: var(--primary-color);
-    }
-
-    .icon-btn.loading svg {
-      animation: rotate 1s linear infinite;
-    }
-
-    @keyframes rotate {
-      from {
-        transform: rotate(0deg);
-      }
-
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* 内容容器 */
-    #toc-container {
-      flex: 1;
-      overflow: auto;
-      padding: 6px 0;
-    }
-
-    /* 下拉菜单样式 */
-    .dropdown-menu {
-      position: absolute;
-      top: 38px;
-      right: 8px;
-      background: #fff;
-      border: 1px solid #eee;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      border-radius: 6px;
-      padding: 4px;
-      min-width: 140px;
-      display: none;
-      /* 默认隐藏 */
-      flex-direction: column;
-      z-index: 1000;
-    }
-
-    .dropdown-menu.show {
-      display: flex;
-    }
-
-    .dropdown-item {
-      padding: 6px 10px;
-      font-size: 13px;
-      color: #333;
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .dropdown-item:hover {
-      background: var(--bg-hover);
-      color: var(--primary-color);
-    }
-
-    .dropdown-divider {
-      height: 1px;
-      background: #eee;
-      margin: 4px 0;
-    }
-
-    .dropdown-header {
-      font-size: 11px;
-      color: #999;
-      padding: 4px 10px;
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    /* 
-       新的嵌套结构样式 
-       .toc-node
-         .toc-header (包含 icon + text)
-         .toc-children (子节点容器)
-    */
-
-    .toc-node {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .toc-header {
-      display: flex;
-      align-items: center;
-      padding: 2px 4px 2px 0;
-      /* 右侧留白，左侧靠 icon 撑开 */
-      cursor: pointer;
-      border-radius: 4px;
-      color: #444;
-      line-height: 1.4;
-      width: fit-content;
-      min-width: 100%;
-      box-sizing: border-box;
-      user-select: none;
-      transition: background 0.1s;
-    }
-
-    /* 悬停基础反馈：仅显示背景色 */
-    .toc-header:hover {
-      background: var(--bg-hover);
-    }
-
-    /* 高亮逻辑：
-       1. 叶子节点：悬停整个条目（包括空白） -> 文字变色 (暗示点击跳转)
-       2. 所有节点：直接悬停在文字上 -> 文字变色 (暗示点击跳转)
-    */
-    .is-leaf>.toc-header:hover,
-    .toc-text:hover {
-      color: var(--primary-color);
-    }
-
-    /* 标题文字样式 */
-    .toc-text {
-      font-size: 13.5px;
-      white-space: nowrap;
-      transition: color 0.1s;
-      /* 平滑颜色过渡 */
-    }
-
-    /* 层级字体大小微调 (移除粗体和固定颜色) */
-    .level-1>.toc-header>.toc-text {
-      font-size: 14px;
-    }
-
-    .level-2>.toc-header>.toc-text {
-      font-size: 13.5px;
-    }
-
-    .level-3>.toc-header>.toc-text,
-    .level-4>.toc-header>.toc-text,
-    .level-5>.toc-header>.toc-text,
-    .level-6>.toc-header>.toc-text {
-      font-size: 13px;
-    }
-
-    /* 折叠图标 */
-    .toggle-icon {
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #999;
-      border-radius: 4px;
-      transition: background 0.2s;
-      /* 只过渡背景色，不过渡 transform */
-      margin-right: 2px;
-    }
-
-    .toggle-icon:hover {
-      background: rgba(0, 0, 0, 0.05);
-      color: #666;
-    }
-
-    /* 图标内的 SVG 负责旋转动画 */
-    .toggle-icon svg {
-      width: 10px;
-      height: 10px;
-      fill: currentColor;
-      transition: transform 0.2s ease;
-    }
-
-    /* 如果没有子节点，隐藏图标占位符 */
-    .is-leaf>.toc-header>.toggle-icon {
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    /* 子节点容器：提供缩进 */
-    .toc-children {
-      padding-left: 18px;
-      /* 缩进 */
-      display: block;
-      border-left: 1px solid transparent;
-    }
-
-    .toc-children:hover {
-      border-left-color: rgba(0, 0, 0, 0.05);
-    }
-
-    /* 折叠状态 */
-    .is-collapsed>.toc-children {
-      display: none;
-    }
-
-    /* 折叠时，图标旋转 -90度 */
-    .is-collapsed>.toc-header>.toggle-icon svg {
-      transform: rotate(-90deg);
-    }
-  </style>
+  <link rel="stylesheet" href="outline.css">
 </head>
 
 <body>
   <header>
     <div class="header-title">Outline</div>
     <div class="header-actions">
+      <!-- 切换模式 (Dock/Float) -->
+      <button class="icon-btn" id="switch-mode-btn" title="切换到悬浮模式">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+          <path
+            d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
+          <!-- Simple icon representing a window/document, maybe change to something more "floaty" later -->
+        </svg>
+      </button>
+
       <!-- 全部折叠 (-) -->
       <button class="icon-btn" id="collapse-all-btn" title="全部折叠">
         <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
@@ -309,7 +63,7 @@
     <div style="padding: 20px; color:#999; text-align:center; font-size:13px;">正在加载...</div>
   </div>
 
-  <script src="sidepanel.js"></script>
+  <script type="module" src="sidepanel.js"></script>
 </body>
 
 </html>

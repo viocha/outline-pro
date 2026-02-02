@@ -1,8 +1,7 @@
 /**
- * 侧边栏核心逻辑脚本
+ * 侧边栏核心逻辑脚本 - Refactored to use OutlineRenderer
  */
-
-// --- 1. 工具函数 ---
+import { OutlineRenderer } from './outline-renderer.js';
 
 function debounce(func, wait) {
   let timeout;
@@ -19,12 +18,19 @@ const menuBtn = document.getElementById('menu-btn');
 const dropdownMenu = document.getElementById('dropdown-menu');
 const collapseAllBtn = document.getElementById('collapse-all-btn');
 const expandAllBtn = document.getElementById('expand-all-btn');
+const switchModeBtn = document.getElementById('switch-mode-btn');
 
 // 状态
-let currentHeadings = [];
 let currentTabId = null;
 
-// --- 2. 核心功能：刷新与数据获取 ---
+// 初始化 Renderer
+const renderer = new OutlineRenderer(container, {
+  onJump: (index) => jumpTo(index),
+  onHighlight: (index) => selectRange(index),
+  onMenuAction: () => dropdownMenu.classList.remove('show')
+});
+
+// --- 核心功能：刷新与数据获取 ---
 
 async function refreshTOC() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -51,10 +57,8 @@ async function refreshTOC() {
     });
 
     if (results && results[0]) {
-      // 预处理：规范化层级 (Normalize Levels)
-      // 找出当前最小的标签层级 (例如页面只有 h2, h3，则 min=2)
-      // 然后将所有层级整体平移，使得最顶层变为 level 1
       const rawHeadings = results[0].result;
+      let currentHeadings = [];
 
       if (rawHeadings.length > 0) {
         let minLevel = 6;
@@ -67,15 +71,18 @@ async function refreshTOC() {
           ...h,
           level: parseInt(h.tag.substring(1)) - minLevel + 1
         }));
-      } else {
-        currentHeadings = [];
       }
 
-      renderTree(currentHeadings);
-      updateDropdownMenu(currentHeadings);
+      renderer.render(currentHeadings);
+
+      // Update Dropdown
+      dropdownMenu.innerHTML = '';
+      const dropdownContent = renderer.createDropdownContent(currentHeadings);
+      dropdownMenu.appendChild(dropdownContent);
+
     } else {
       container.innerHTML = '<p style="color:gray; font-size:13px; padding:15px; text-align:center;">未发现标题大纲</p>';
-      updateDropdownMenu([]);
+      dropdownMenu.innerHTML = '';
     }
 
     // 注入内容观察者
@@ -92,121 +99,7 @@ async function refreshTOC() {
   }
 }
 
-// --- 3. 渲染逻辑 (Stack-based Nested Tree) ---
-
-function renderTree(headings) {
-  container.innerHTML = '';
-
-  if (!headings || headings.length === 0) {
-    container.innerHTML = '<p style="color:gray; font-size:13px; padding:15px; text-align:center;">未发现标题</p>';
-    return;
-  }
-
-  // 虚拟根节点，level 0
-  const rootDiv = document.createElement('div');
-  const stack = [{ element: rootDiv, level: 0 }];
-
-  headings.forEach((h, index) => {
-    // 使用规范化后的 level
-    const level = h.level;
-
-    // 1. 回溯栈：找到当前节点的正确父容器
-    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
-      stack.pop();
-    }
-
-    const parentEntry = stack[stack.length - 1];
-
-    // 2. 创建当前节点结构
-    const node = document.createElement('div');
-    node.className = `toc-node level-${level}`;
-    node.dataset.index = index;
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'toc-header';
-
-    // Icon
-    const icon = document.createElement('div');
-    icon.className = 'toggle-icon';
-    icon.innerHTML = '<svg viewBox="0 0 16 16"><path d="M4.646 6.354l3.328 3.329 3.328-3.329c.195-.195.512-.195.707 0s.195.512 0 .707l-3.683 3.682c-.195.195-.512.195-.707 0L4.293 7.06a.5.5 0 0 1 .453-.806z"/></svg>';
-
-    // Text
-    const text = document.createElement('div');
-    text.className = 'toc-text';
-    text.innerText = h.text;
-    text.title = h.text;
-
-    // 文字点击：总是由于跳转
-    text.onclick = (e) => {
-      e.stopPropagation();
-      jumpTo(index);
-    };
-    text.ondblclick = (e) => {
-      e.stopPropagation();
-      selectRange(index);
-    };
-
-    // Header 点击逻辑
-    header.onclick = () => {
-      if (node.classList.contains('is-leaf')) {
-        jumpTo(index);
-      } else {
-        toggleNode(node);
-      }
-    };
-
-    // Header 双击逻辑 (仅叶子节点支持居中跳转)
-    header.ondblclick = (e) => {
-      e.stopPropagation();
-      if (node.classList.contains('is-leaf')) {
-        selectRange(index);
-      }
-    };
-
-    header.appendChild(icon);
-    header.appendChild(text);
-
-    // Children Container
-    const childrenContainer = document.createElement('div');
-    childrenContainer.className = 'toc-children';
-
-    node.appendChild(header);
-    node.appendChild(childrenContainer);
-
-    // 3. 挂载
-    parentEntry.element.appendChild(node);
-
-    // 4. 更新父节点的“无子节点”状态
-    if (parentEntry.nodeRef) {
-      parentEntry.nodeRef.classList.remove('is-leaf');
-    }
-
-    // 默认当前是叶子
-    node.classList.add('is-leaf');
-
-    // 入栈
-    stack.push({
-      element: childrenContainer,
-      level: level,
-      nodeRef: node
-    });
-  });
-
-  while (rootDiv.firstChild) {
-    container.appendChild(rootDiv.firstChild);
-  }
-}
-
-// --- 4. 交互操作 ---
-
-function toggleNode(node) {
-  if (node.classList.contains('is-collapsed')) {
-    node.classList.remove('is-collapsed');
-  } else {
-    node.classList.add('is-collapsed');
-  }
-}
+// --- 交互操作 (Chrome Scripting) ---
 
 function jumpTo(index) {
   if (currentTabId === null) return;
@@ -238,7 +131,6 @@ function selectRange(index) {
       selection.addRange(range);
       startNode.scrollIntoView({ behavior: 'instant', block: 'center' });
 
-      // Auto cancel highlight after 0.5s
       setTimeout(() => {
         selection.removeAllRanges();
       }, 500);
@@ -246,133 +138,8 @@ function selectRange(index) {
   });
 }
 
-// 动态生成下拉菜单
-// 动态生成下拉菜单
-function updateDropdownMenu(headings) {
-  dropdownMenu.innerHTML = '';
 
-  // 标题
-  const header = document.createElement('div');
-  header.className = 'dropdown-header';
-  header.innerText = 'Show Levels';
-  dropdownMenu.appendChild(header);
-
-  let maxLevel = 0;
-  if (headings && headings.length > 0) {
-    headings.forEach(h => {
-      // 只要 refreshTOC 中正确计算了 level，这里直接取 level 即可
-      // 如果是为了稳健，也可以再次走一遍 tagName 解析
-      // 但由于 headings 可能是还没 normalize 的（如果调用时机问题），或者已经 normalize 的。
-      // 我们统一在 refreshTOC 中规范化， renderTree 和 updateDropdownMenu 都依赖规范化后的数据。
-      const l = h.level || (parseInt(h.tag.substring(1)) - (h.minLevelDifference || 0)); // fallback
-      if (l > maxLevel) maxLevel = l;
-    });
-  }
-
-  // 支持 1 到 6，或者最大层级。用户要求更全面，直到 6。
-  // 但最大只到 maxLevel 即可，超过 maxLevel 没有意义（和 expand all 一样）。
-  // 为了 UI 统一，我们可以显示到 max(maxLevel, 6) 或者 min(maxLevel, 6) ?
-  // 用户说 "把1加上，支持1 到 6 ，更全面"。
-  // 我们就循环到 maxLevel，如果 maxLevel < 1，则不显示？
-  const limit = Math.max(maxLevel, 1);
-
-  for (let i = 1; i <= limit; i++) {
-    if (i > 6) break; // 限制最多到 Level 6
-    const item = createDropdownItem(`Level ${i}`, () => expandToLevel(i));
-    dropdownMenu.appendChild(item);
-  }
-}
-
-function createDropdownItem(text, onClick) {
-  const div = document.createElement('div');
-  div.className = 'dropdown-item';
-  div.innerText = text;
-  div.onclick = (e) => {
-    e.stopPropagation();
-    onClick();
-    dropdownMenu.classList.remove('show');
-  };
-  return div;
-}
-
-// --- 5. 全局控制 ---
-
-function toggleMenu() {
-  dropdownMenu.classList.toggle('show');
-}
-
-// 点击外部关闭菜单
-document.addEventListener('click', (e) => {
-  if (menuBtn && !menuBtn.contains(e.target) && dropdownMenu && !dropdownMenu.contains(e.target)) {
-    dropdownMenu.classList.remove('show');
-  }
-});
-
-if (menuBtn) {
-  menuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleMenu();
-  });
-}
-
-// 绑定顶部工具栏按钮
-if (collapseAllBtn) {
-  collapseAllBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    collapseAllNodes();
-  });
-}
-
-if (expandAllBtn) {
-  expandAllBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    expandAllNodes();
-  });
-}
-
-function collapseAllNodes() {
-  const nodes = container.querySelectorAll('.toc-node');
-  nodes.forEach(node => {
-    if (!node.classList.contains('is-leaf')) {
-      node.classList.add('is-collapsed');
-    }
-  });
-}
-
-function expandAllNodes() {
-  const nodes = container.querySelectorAll('.toc-node');
-  nodes.forEach(node => {
-    node.classList.remove('is-collapsed');
-  });
-}
-
-// 展开到指定层级 (Show Level N)
-function expandToLevel(targetLevel) {
-  const nodes = container.querySelectorAll('.toc-node');
-  nodes.forEach(node => {
-    const match = node.className.match(/level-(\d+)/);
-    if (match) {
-      const level = parseInt(match[1]);
-      // 如果当前节点层级 < 目标层级，则应该展开（以便显示其子节点）
-      // 如果当前节点层级 >= 目标层级，则应该折叠（隐藏其子节点）
-
-      // 例如：Show Level 2 (targetLevel=2)
-      // Level 1: 1 < 2 -> remove collapsed (显示 Level 1 子节点即 Level 2)
-      // Level 2: 2 >= 2 -> add collapsed (隐藏 Level 2 子节点即 Level 3)
-
-      if (level < targetLevel) {
-        node.classList.remove('is-collapsed');
-      } else {
-        if (!node.classList.contains('is-leaf')) {
-          node.classList.add('is-collapsed');
-        }
-      }
-    }
-  });
-}
-
-
-// --- 6. 页面监控 ---
+// --- 页面监控 ---
 
 function setupContentObserver() {
   if (window.hasOutlineObserver) return;
@@ -397,12 +164,9 @@ function setupContentObserver() {
           shouldRefresh = true; break;
         }
       } else if (mutation.type === 'childList') {
-        // 快速扫描节点
         const checkNode = (n) => n.nodeType === 1 && (/^H[1-6]$/i.test(n.tagName) || n.querySelector('h1,h2,h3,h4,h5,h6'));
-
         for (const node of mutation.addedNodes) { if (checkNode(node)) { shouldRefresh = true; break; } }
         if (!shouldRefresh) for (const node of mutation.removedNodes) { if (checkNode(node)) { shouldRefresh = true; break; } }
-
         if (!shouldRefresh && mutation.target && mutation.target.tagName && /^H[1-6]$/i.test(mutation.target.tagName)) {
           shouldRefresh = true;
         }
@@ -415,14 +179,14 @@ function setupContentObserver() {
   if (document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
 
-// 事件绑定
+// --- 事件绑定 ---
+
 const debouncedRefresh = debounce(refreshTOC, 300);
 
 refreshBtn.addEventListener('click', (e) => {
   e.preventDefault();
   refreshBtn.classList.add('loading');
   refreshTOC().finally(() => refreshBtn.classList.remove('loading'));
-  // 注意：refreshTOC 内部也有 loading 控制，这里加一下为了立刻响应点击
 });
 
 chrome.runtime.onMessage.addListener((msg) => {
@@ -432,6 +196,54 @@ chrome.tabs.onUpdated.addListener((id, info, tab) => {
   if (info.status === 'complete' && tab.active) debouncedRefresh();
 });
 chrome.tabs.onActivated.addListener(debouncedRefresh);
+
+// Dropdown Menu Control
+if (menuBtn) {
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownMenu.classList.toggle('show');
+  });
+}
+document.addEventListener('click', (e) => {
+  if (menuBtn && !menuBtn.contains(e.target) && dropdownMenu && !dropdownMenu.contains(e.target)) {
+    dropdownMenu.classList.remove('show');
+  }
+});
+
+// Collapse/Expand Utils
+if (collapseAllBtn) {
+  collapseAllBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    renderer.collapseAll();
+  });
+}
+
+if (expandAllBtn) {
+  expandAllBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    renderer.expandAll();
+  });
+}
+
+// Switch Mode
+if (switchModeBtn) {
+  switchModeBtn.addEventListener('click', async () => {
+    // 1. Send message to background to enable floating mode for this tab
+    // 2. Close this side panel
+
+    try {
+      await chrome.runtime.sendMessage({
+        action: "SWITCH_TO_FLOATING",
+        tabId: currentTabId
+      });
+      // Close window if possible (standard way is just leaving it to the user or if we can close it)
+      // Note: window.close() on side panel script might work.
+      window.close();
+    } catch (e) {
+      console.error("Switch failed", e);
+    }
+  });
+}
 
 // 启动
 refreshTOC();
