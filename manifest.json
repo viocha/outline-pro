@@ -10,7 +10,7 @@
       "128": "icon.png"
    },
    "manifest_version": 3,
-   "name": "Outline",
+   "name": "Outline Pro",
    "permissions": [ "sidePanel", "scripting" ],
    "side_panel": {
       "default_path": "sidepanel.html"

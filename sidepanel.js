@@ -1,5 +1,5 @@
 /**
- * Outline Side - 核心逻辑脚本 (Nested Tree Version)
+ * 侧边栏核心逻辑脚本
  */
 
 // --- 1. 工具函数 ---
