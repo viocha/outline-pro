@@ -156,6 +156,14 @@ function renderTree(headings) {
       }
     };
 
+    // Header 双击逻辑 (仅叶子节点支持居中跳转)
+    header.ondblclick = (e) => {
+      e.stopPropagation();
+      if (node.classList.contains('is-leaf')) {
+        selectRange(index);
+      }
+    };
+
     header.appendChild(icon);
     header.appendChild(text);
 
@@ -222,26 +230,18 @@ function selectRange(index) {
       const startNode = els[idx];
       if (!startNode) return;
 
-      const startLevel = parseInt(startNode.tagName.substring(1));
-      const parentContainer = startNode.parentElement; // 获取父元素作为边界参考
-
-      let endNode = null;
-      // 这里的逻辑需要更健壮：找到“下一个同级或高级标题”之前的那个元素
-      // 简单起见，从 startNode 开始往下找
-
-      // 实际上，双击选中范围在复杂DOM中很难完美。这里保留原有的简单逻辑或稍作改进
-      // 原有逻辑：遍历所有元素？太慢。
-      // 新逻辑：Range 选中当前标题即可，或者选中标题所在行。
-      // 用户之前有“选中章节范围”的需求，我们保留类似逻辑但简化
-
       const range = document.createRange();
       const selection = window.getSelection();
       selection.removeAllRanges();
 
       range.selectNodeContents(startNode);
-      // 如果要选中整个段落，需要复杂解析。暂时只选中标题本身，响应更快。
       selection.addRange(range);
       startNode.scrollIntoView({ behavior: 'instant', block: 'center' });
+
+      // Auto cancel highlight after 0.5s
+      setTimeout(() => {
+        selection.removeAllRanges();
+      }, 500);
     }
   });
 }
