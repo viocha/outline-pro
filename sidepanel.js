@@ -15,6 +15,8 @@ function debounce(func, wait) {
 // UI 元素
 const container = document.getElementById('toc-container');
 const refreshBtn = document.getElementById('refresh-btn');
+const menuBtn = document.getElementById('menu-btn');
+const dropdownMenu = document.getElementById('dropdown-menu');
 const collapseAllBtn = document.getElementById('collapse-all-btn');
 const expandAllBtn = document.getElementById('expand-all-btn');
 
@@ -49,10 +51,31 @@ async function refreshTOC() {
     });
 
     if (results && results[0]) {
-      currentHeadings = results[0].result;
+      // 预处理：规范化层级 (Normalize Levels)
+      // 找出当前最小的标签层级 (例如页面只有 h2, h3，则 min=2)
+      // 然后将所有层级整体平移，使得最顶层变为 level 1
+      const rawHeadings = results[0].result;
+
+      if (rawHeadings.length > 0) {
+        let minLevel = 6;
+        rawHeadings.forEach(h => {
+          const l = parseInt(h.tag.substring(1));
+          if (l < minLevel) minLevel = l;
+        });
+
+        currentHeadings = rawHeadings.map(h => ({
+          ...h,
+          level: parseInt(h.tag.substring(1)) - minLevel + 1
+        }));
+      } else {
+        currentHeadings = [];
+      }
+
       renderTree(currentHeadings);
+      updateDropdownMenu(currentHeadings);
     } else {
       container.innerHTML = '<p style="color:gray; font-size:13px; padding:15px; text-align:center;">未发现标题大纲</p>';
+      updateDropdownMenu([]);
     }
 
     // 注入内容观察者
@@ -84,10 +107,10 @@ function renderTree(headings) {
   const stack = [{ element: rootDiv, level: 0 }];
 
   headings.forEach((h, index) => {
-    const level = parseInt(h.tag.substring(1));
+    // 使用规范化后的 level
+    const level = h.level;
 
     // 1. 回溯栈：找到当前节点的正确父容器
-    // 规则：只要栈顶元素的 level >= 当前 level，就说明栈顶范围结束了，出栈
     while (stack.length > 1 && stack[stack.length - 1].level >= level) {
       stack.pop();
     }
@@ -107,13 +130,6 @@ function renderTree(headings) {
     const icon = document.createElement('div');
     icon.className = 'toggle-icon';
     icon.innerHTML = '<svg viewBox="0 0 16 16"><path d="M4.646 6.354l3.328 3.329 3.328-3.329c.195-.195.512-.195.707 0s.195.512 0 .707l-3.683 3.682c-.195.195-.512.195-.707 0L4.293 7.06a.5.5 0 0 1 .453-.806z"/></svg>';
-    // icon click event handled by header bubbling or ignored if we rely purely on header
-    // Removed specific onclick to rely on header logic or just let bubbling happen?
-    // User wants icon to toggle. Header logic handles "if not leaf -> toggle".
-    // Icon is inside header. Bubble -> Header -> Toggle.
-    // So we don't need a specific handler here unless we want to stopProp?
-    // If we stopProp on icon, header won't fire. But we WANT header logic.
-    // So deleting this block is correct.
 
     // Text
     const text = document.createElement('div');
@@ -121,7 +137,7 @@ function renderTree(headings) {
     text.innerText = h.text;
     text.title = h.text;
 
-    // 文字点击：总是由于跳转。阻止冒泡，避免触发 Header 层的折叠逻辑
+    // 文字点击：总是由于跳转
     text.onclick = (e) => {
       e.stopPropagation();
       jumpTo(index);
@@ -131,9 +147,7 @@ function renderTree(headings) {
       selectRange(index);
     };
 
-    // Header 点击逻辑：
-    // 1. 如果是叶子节点 -> 跳转
-    // 2. 如果是父节点 -> 折叠/展开 (icon 和 空白区域都触发此逻辑)
+    // Header 点击逻辑
     header.onclick = () => {
       if (node.classList.contains('is-leaf')) {
         jumpTo(index);
@@ -155,7 +169,7 @@ function renderTree(headings) {
     // 3. 挂载
     parentEntry.element.appendChild(node);
 
-    // 4. 更新父节点的“无子节点”状态 (is-leaf)
+    // 4. 更新父节点的“无子节点”状态
     if (parentEntry.nodeRef) {
       parentEntry.nodeRef.classList.remove('is-leaf');
     }
@@ -171,9 +185,6 @@ function renderTree(headings) {
     });
   });
 
-  // 将构建好的 DOM 树插入页面，忽略 rootDiv 本身，只取其 children
-  // (其实 headings 是同级的，所以可能有多个 root 节点，append rootDiv 下的所有子元素更安全，或者直接 append rootDiv 但 rootDiv 没样式)
-  // 我们直接 append rootDiv 的 children
   while (rootDiv.firstChild) {
     container.appendChild(rootDiv.firstChild);
   }
@@ -235,24 +246,130 @@ function selectRange(index) {
   });
 }
 
+// 动态生成下拉菜单
+// 动态生成下拉菜单
+function updateDropdownMenu(headings) {
+  dropdownMenu.innerHTML = '';
+
+  // 标题
+  const header = document.createElement('div');
+  header.className = 'dropdown-header';
+  header.innerText = 'Show Levels';
+  dropdownMenu.appendChild(header);
+
+  let maxLevel = 0;
+  if (headings && headings.length > 0) {
+    headings.forEach(h => {
+      // 只要 refreshTOC 中正确计算了 level，这里直接取 level 即可
+      // 如果是为了稳健，也可以再次走一遍 tagName 解析
+      // 但由于 headings 可能是还没 normalize 的（如果调用时机问题），或者已经 normalize 的。
+      // 我们统一在 refreshTOC 中规范化， renderTree 和 updateDropdownMenu 都依赖规范化后的数据。
+      const l = h.level || (parseInt(h.tag.substring(1)) - (h.minLevelDifference || 0)); // fallback
+      if (l > maxLevel) maxLevel = l;
+    });
+  }
+
+  // 支持 1 到 6，或者最大层级。用户要求更全面，直到 6。
+  // 但最大只到 maxLevel 即可，超过 maxLevel 没有意义（和 expand all 一样）。
+  // 为了 UI 统一，我们可以显示到 max(maxLevel, 6) 或者 min(maxLevel, 6) ?
+  // 用户说 "把1加上，支持1 到 6 ，更全面"。
+  // 我们就循环到 maxLevel，如果 maxLevel < 1，则不显示？
+  const limit = Math.max(maxLevel, 1);
+
+  for (let i = 1; i <= limit; i++) {
+    if (i > 6) break; // 限制最多到 Level 6
+    const item = createDropdownItem(`Level ${i}`, () => expandToLevel(i));
+    dropdownMenu.appendChild(item);
+  }
+}
+
+function createDropdownItem(text, onClick) {
+  const div = document.createElement('div');
+  div.className = 'dropdown-item';
+  div.innerText = text;
+  div.onclick = (e) => {
+    e.stopPropagation();
+    onClick();
+    dropdownMenu.classList.remove('show');
+  };
+  return div;
+}
+
 // --- 5. 全局控制 ---
 
-// 一键折叠：将所有非叶子节点设为 collapsed
-collapseAllBtn.addEventListener('click', () => {
+function toggleMenu() {
+  dropdownMenu.classList.toggle('show');
+}
+
+// 点击外部关闭菜单
+document.addEventListener('click', (e) => {
+  if (menuBtn && !menuBtn.contains(e.target) && dropdownMenu && !dropdownMenu.contains(e.target)) {
+    dropdownMenu.classList.remove('show');
+  }
+});
+
+if (menuBtn) {
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+}
+
+// 绑定顶部工具栏按钮
+if (collapseAllBtn) {
+  collapseAllBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    collapseAllNodes();
+  });
+}
+
+if (expandAllBtn) {
+  expandAllBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    expandAllNodes();
+  });
+}
+
+function collapseAllNodes() {
   const nodes = container.querySelectorAll('.toc-node');
   nodes.forEach(node => {
     if (!node.classList.contains('is-leaf')) {
       node.classList.add('is-collapsed');
     }
   });
-});
+}
 
-expandAllBtn.addEventListener('click', () => {
+function expandAllNodes() {
   const nodes = container.querySelectorAll('.toc-node');
   nodes.forEach(node => {
     node.classList.remove('is-collapsed');
   });
-});
+}
+
+// 展开到指定层级 (Show Level N)
+function expandToLevel(targetLevel) {
+  const nodes = container.querySelectorAll('.toc-node');
+  nodes.forEach(node => {
+    const match = node.className.match(/level-(\d+)/);
+    if (match) {
+      const level = parseInt(match[1]);
+      // 如果当前节点层级 < 目标层级，则应该展开（以便显示其子节点）
+      // 如果当前节点层级 >= 目标层级，则应该折叠（隐藏其子节点）
+
+      // 例如：Show Level 2 (targetLevel=2)
+      // Level 1: 1 < 2 -> remove collapsed (显示 Level 1 子节点即 Level 2)
+      // Level 2: 2 >= 2 -> add collapsed (隐藏 Level 2 子节点即 Level 3)
+
+      if (level < targetLevel) {
+        node.classList.remove('is-collapsed');
+      } else {
+        if (!node.classList.contains('is-leaf')) {
+          node.classList.add('is-collapsed');
+        }
+      }
+    }
+  });
+}
 
 
 // --- 6. 页面监控 ---
