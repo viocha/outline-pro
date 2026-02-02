@@ -49,7 +49,7 @@ async function refreshTOC() {
     // 注入“标题变更哨兵”
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: setupTitleObserver
+      func: setupContentObserver
     });
 
   } catch (err) {
@@ -154,16 +154,79 @@ function renderTOC(headings, tabId) {
 
 // --- 4. 页面监听脚本（在目标网页运行） ---
 
-function setupTitleObserver() {
+function setupContentObserver() {
   if (window.hasOutlineObserver) return;
   window.hasOutlineObserver = true;
 
-  const titleTag = document.querySelector('title');
-  if (titleTag) {
-    const observer = new MutationObserver(() => {
-      chrome.runtime.sendMessage({ action: "AUTO_REFRESH" });
+  // 内置防抖函数
+  function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
+
+  // 发送更新通知
+  const sendUpdate = debounce(() => {
+    chrome.runtime.sendMessage({ action: "AUTO_REFRESH" });
+  }, 300);
+
+  const observer = new MutationObserver((mutations) => {
+    let shouldRefresh = false;
+
+    for (const mutation of mutations) {
+      // 1. 文本内容变化：检查父节点是否为标题
+      if (mutation.type === 'characterData') {
+        if (mutation.target.parentNode && /^H[1-6]$/i.test(mutation.target.parentNode.tagName)) {
+          shouldRefresh = true;
+          break;
+        }
+      }
+      // 2. 节点增删：检查是否涉及标题元素
+      else if (mutation.type === 'childList') {
+        // 检查新增节点
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === 1) { // 元素节点
+            if (/^H[1-6]$/i.test(node.tagName) || node.querySelector('h1, h2, h3, h4, h5, h6')) {
+              shouldRefresh = true;
+              break;
+            }
+          }
+        }
+        if (shouldRefresh) break;
+
+        // 检查移除节点
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType === 1) { // 元素节点
+            if (/^H[1-6]$/i.test(node.tagName) || node.querySelector('h1, h2, h3, h4, h5, h6')) {
+              shouldRefresh = true;
+              break;
+            }
+          }
+        }
+        if (shouldRefresh) break;
+
+        // 检查目标节点本身是否为标题（例如插入 span 到 h1 中）
+        if (mutation.target && mutation.target.tagName && /^H[1-6]$/i.test(mutation.target.tagName)) {
+          shouldRefresh = true;
+          break;
+        }
+      }
+    }
+
+    if (shouldRefresh) {
+      sendUpdate();
+    }
+  });
+
+  // 观察整个 body 的变化
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
     });
-    observer.observe(titleTag, { childList: true, subtree: true, characterData: true });
   }
 }
 
