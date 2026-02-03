@@ -4,7 +4,7 @@
 export class OutlineRenderer {
     constructor(container, options = {}) {
         this.container = container;
-        this.options = options; // { onRefresh, onJump, onHighlight, onSwitchMode }
+        this.options = options; // { onRefresh, onJump, onHighlight, onSwitchMode, onMenuAction }
         this.currentHeadings = [];
     }
 
@@ -105,6 +105,9 @@ export class OutlineRenderer {
         while (rootDiv.firstChild) {
             this.container.appendChild(rootDiv.firstChild);
         }
+
+        // Auto Smart Collapse (Threshold 50)
+        this.smartCollapse(50);
     }
 
     toggleNode(node) {
@@ -148,6 +151,41 @@ export class OutlineRenderer {
         });
     }
 
+    /**
+     * Smart Collapse Function
+     * Collapses nodes with more children than threshold.
+     * Exception: If there is only ONE Level-1 node, it is never collapsed.
+     * @param {number} threshold - The count of children to trigger collapse
+     */
+    smartCollapse(threshold) {
+        // 1. Check for single Level-1 exception
+        const level1Nodes = Array.from(this.container.querySelectorAll('.toc-node.level-1'));
+        const isSingleLevel1 = level1Nodes.length === 1;
+        const singleLevel1Ref = isSingleLevel1 ? level1Nodes[0] : null;
+
+        // 2. Iterate all parent nodes
+        const parentNodes = this.container.querySelectorAll('.toc-node:not(.is-leaf)');
+        parentNodes.forEach(node => {
+            // Exception Logic: If it is the single dominant level-1 node, force expand
+            if (node === singleLevel1Ref) {
+                node.classList.remove('is-collapsed');
+                return;
+            }
+
+            const childrenContainer = node.querySelector('.toc-children');
+            if (childrenContainer) {
+                // Count direct children nodes
+                const childCount = childrenContainer.querySelectorAll(':scope > .toc-node').length;
+
+                if (childCount > threshold) {
+                    node.classList.add('is-collapsed');
+                } else {
+                    node.classList.remove('is-collapsed');
+                }
+            }
+        });
+    }
+
     // Generate Dropdown Menu Content
     createDropdownContent(headings) {
         const fragment = document.createDocumentFragment();
@@ -174,13 +212,48 @@ export class OutlineRenderer {
             item.onclick = (e) => {
                 e.stopPropagation();
                 this.expandToLevel(i);
-                // callback to close menu if needed, or caller handles it
-                // Since renderer doesn't manage external menu state, we just perform action
-                // We might need a callback "onMenuAction" to close the menu
                 if (this.options.onMenuAction) this.options.onMenuAction();
             };
             fragment.appendChild(item);
         }
+
+        // --- Smart Collapse Section ---
+        // 1. Calculate Max Direct Children Count across the entire tree
+        let maxChildren = 0;
+        const childrenContainers = this.container.querySelectorAll('.toc-children');
+        childrenContainers.forEach(container => {
+            const count = container.querySelectorAll(':scope > .toc-node').length;
+            if (count > maxChildren) maxChildren = count;
+        });
+
+        // 2. Filter useful thresholds
+        // A threshold T is useful if there is at least one node with children > T
+        const allThresholds = [10, 20, 30, 40, 50];
+        const validThresholds = allThresholds.filter(t => maxChildren > t);
+
+        if (validThresholds.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'dropdown-divider';
+            fragment.appendChild(divider);
+
+            const scHeader = document.createElement('div');
+            scHeader.className = 'dropdown-header';
+            scHeader.innerText = 'Smart Collapse';
+            fragment.appendChild(scHeader);
+
+            validThresholds.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.innerText = `> ${t} Items`;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    this.smartCollapse(t);
+                    if (this.options.onMenuAction) this.options.onMenuAction();
+                };
+                fragment.appendChild(item);
+            });
+        }
+
         return fragment;
     }
 }
