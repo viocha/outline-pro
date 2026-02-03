@@ -48,7 +48,7 @@ export class OutlineRenderer {
             // Text
             const text = document.createElement('div');
             text.className = 'toc-text';
-            text.innerText = h.text;
+            text.textContent = h.text;
             text.title = h.text;
 
             // Click events
@@ -192,7 +192,7 @@ export class OutlineRenderer {
 
         const header = document.createElement('div');
         header.className = 'dropdown-header';
-        header.innerText = 'Show Levels';
+        header.textContent = 'Show Levels';
         fragment.appendChild(header);
 
         let maxLevel = 0;
@@ -208,7 +208,7 @@ export class OutlineRenderer {
             if (i > 6) break;
             const item = document.createElement('div');
             item.className = 'dropdown-item';
-            item.innerText = `Level ${i}`;
+            item.textContent = `Level ${i}`;
             item.onclick = (e) => {
                 e.stopPropagation();
                 this.expandToLevel(i);
@@ -238,13 +238,13 @@ export class OutlineRenderer {
 
             const scHeader = document.createElement('div');
             scHeader.className = 'dropdown-header';
-            scHeader.innerText = 'Smart Collapse';
+            scHeader.textContent = 'Smart Collapse';
             fragment.appendChild(scHeader);
 
             validThresholds.forEach(t => {
                 const item = document.createElement('div');
                 item.className = 'dropdown-item';
-                item.innerText = `> ${t} Items`;
+                item.textContent = `> ${t} Items`;
                 item.onclick = (e) => {
                     e.stopPropagation();
                     this.smartCollapse(t);

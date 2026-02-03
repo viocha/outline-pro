@@ -289,7 +289,7 @@ function getHeadings() {
     const tags = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
     return Array.from(tags).map(t => ({
         tag: t.tagName,
-        text: t.innerText.trim(),
+        text: t.textContent.trim(),
         id: t.id,
         element: t // Keep ref for jumping
     })).filter(h => h.text.length > 0);
