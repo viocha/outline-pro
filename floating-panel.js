@@ -92,9 +92,19 @@ async function createPanelUI(initialState = null) {
     shadowRoot = overlayContainer.attachShadow({ mode: 'open' });
 
     // 2. Inject Styles
+    // Create wrapper first to handle visibility
+    const wrapper = document.createElement('div');
+    wrapper.id = 'panel-container';
+    wrapper.style.opacity = '0'; // Start hidden to prevent FOUC
+
     const linkElem = document.createElement('link');
     linkElem.setAttribute('rel', 'stylesheet');
     linkElem.setAttribute('href', chrome.runtime.getURL('outline.css'));
+
+    // Show content only after styles load
+    linkElem.onload = () => {
+        wrapper.style.opacity = '1';
+    };
     shadowRoot.appendChild(linkElem);
 
     // Additional floating specific styles
@@ -102,6 +112,7 @@ async function createPanelUI(initialState = null) {
     style.textContent = `
     :host {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
       --primary-color: #007bff;
       --bg-hover: #f0f7ff;
     }
@@ -170,8 +181,7 @@ async function createPanelUI(initialState = null) {
     shadowRoot.appendChild(style);
 
     // 3. UI Structure (Merged Header)
-    const wrapper = document.createElement('div');
-    wrapper.id = 'panel-container';
+    // wrapper is already created above
     wrapper.innerHTML = `
     <header>
       <div class="header-title">Outline</div>
