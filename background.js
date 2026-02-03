@@ -141,6 +141,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // Cleanup state when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
+  const key = `floating_state_${tabId}`;
   chrome.storage.local.remove(key);
 });
 
