@@ -79,6 +79,7 @@ async function createPanelUI() {
       --bg-hover: #f0f7ff;
     }
     #panel-container {
+      position: relative;
       display: flex;
       flex-direction: column;
       height: 100%;
@@ -112,15 +113,23 @@ async function createPanelUI() {
     }
     /* Simple Resizer */
     .resizer {
-      width: 12px;
-      height: 12px;
+      width: 16px;
+      height: 16px;
       position: absolute;
-      bottom: 0;
-      right: 0;
+      bottom: 2px;
+      right: 2px;
       cursor: se-resize;
-      /* Triangle indicator */
-      background: linear-gradient(135deg, transparent 50%, #ccc 50%);
-      border-radius: 0 0 4px 0;
+      /* Aesthetic drag handle using mask */
+      -webkit-mask-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg%20viewBox%3D%220%200%2012%2012%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M8%2010L10%208M4%2010L10%204%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E');
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      -webkit-mask-size: 100% 100%;
+      background-color: #ccc;
+      transition: background-color 0.2s;
+      z-index: 10;
+    }
+    .resizer:hover {
+      background-color: #888;
     }
   `;
     shadowRoot.appendChild(style);
