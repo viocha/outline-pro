@@ -113,3 +113,34 @@ function toggleFloatingPanel(tabId, actionType) {
       }
     });
 }
+
+// --- Tab-Scoped State Management ---
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "SAVE_FLOATING_STATE") {
+    // Save state keyed by tabId
+    const tabId = sender.tab ? sender.tab.id : null;
+    if (tabId && msg.state) {
+      const key = `floating_state_${tabId}`;
+      chrome.storage.local.set({ [key]: msg.state });
+    }
+  } else if (msg.action === "GET_FLOATING_STATE") {
+    // Retrieve state for this tab
+    const tabId = sender.tab ? sender.tab.id : null;
+    if (tabId) {
+      const key = `floating_state_${tabId}`;
+      chrome.storage.local.get(key, (data) => {
+        sendResponse(data[key] || null);
+      });
+      return true; // Keep channel open for async response
+    } else {
+      sendResponse(null);
+    }
+  }
+});
+
+// Cleanup state when tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const key = `floating_state_${tabId}`;
+  chrome.storage.local.remove(key);
+});

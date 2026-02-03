@@ -42,7 +42,8 @@
    "permissions": [
       "sidePanel",
       "scripting",
-      "contextMenus"
+      "contextMenus",
+      "storage"
    ],
    "commands": {
       "toggle-floating-outline": {

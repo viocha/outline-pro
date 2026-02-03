@@ -32,33 +32,60 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function showPanel() {
+    // Restore state from background (tab-scoped)
+    const state = await chrome.runtime.sendMessage({ action: "GET_FLOATING_STATE" });
+
     if (overlayContainer) {
         overlayContainer.style.display = 'block';
+        if (state) {
+            if (state.top) overlayContainer.style.top = state.top;
+            if (state.right) overlayContainer.style.right = state.right;
+            if (state.width) overlayContainer.style.width = state.width;
+            if (state.height) overlayContainer.style.height = state.height;
+        }
         refreshTOC(); // Refresh on show
+        savePanelState();
         return;
     }
 
     // Initial Setup
-    await createPanelUI();
+    await createPanelUI(state);
     refreshTOC();
     setupContentObserver();
+    savePanelState();
 }
 
 function hidePanel() {
     if (overlayContainer) {
         overlayContainer.style.display = 'none';
+        savePanelState();
     }
 }
 
-async function createPanelUI() {
+function savePanelState() {
+    if (!overlayContainer) return;
+    const state = {
+        isVisible: overlayContainer.style.display !== 'none',
+        top: overlayContainer.style.top,
+        right: overlayContainer.style.right,
+        width: overlayContainer.style.width,
+        height: overlayContainer.style.height
+    };
+    chrome.runtime.sendMessage({ action: "SAVE_FLOATING_STATE", state: state });
+}
+
+async function createPanelUI(initialState = null) {
     // 1. Create Host
     overlayContainer = document.createElement('div');
     overlayContainer.id = 'outline-floating-host';
     overlayContainer.style.position = 'fixed';
-    overlayContainer.style.top = '100px';
-    overlayContainer.style.right = '20px';
-    overlayContainer.style.width = '300px';
-    overlayContainer.style.height = '400px'; // Initial height
+
+    // Use stored state or defaults
+    overlayContainer.style.top = initialState?.top || '100px';
+    overlayContainer.style.right = initialState?.right || '20px';
+    overlayContainer.style.width = initialState?.width || '300px';
+    overlayContainer.style.height = initialState?.height || '400px';
+
     overlayContainer.style.zIndex = '2147483647'; // Max z-index
     overlayContainer.style.display = 'block';
     // Shadow DOM to isolate styles
@@ -364,6 +391,7 @@ function setupDrag(element, handle) {
         isDragging = false;
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        savePanelState();
     }
 }
 
@@ -417,6 +445,7 @@ function setupResize(element, handle) {
         isResizing = false;
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        savePanelState();
     }
 }
 
@@ -456,3 +485,10 @@ function setupContentObserver() {
 
     if (document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
+
+// Restore state on load
+chrome.runtime.sendMessage({ action: "GET_FLOATING_STATE" }, (state) => {
+    if (state && state.isVisible) {
+        showPanel();
+    }
+});
