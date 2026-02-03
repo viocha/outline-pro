@@ -164,7 +164,7 @@ async function createPanelUI(initialState = null) {
       transition: background-color 0.2s;
     }
     .resizer:hover::after {
-      background-color: #888;
+      background-color: #aaa;
     }
   `;
     shadowRoot.appendChild(style);

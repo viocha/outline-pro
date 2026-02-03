@@ -222,3 +222,23 @@ header {
 .is-collapsed>.toc-header>.toggle-icon svg {
   transform: rotate(-90deg);
 }
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+} 
+
+::-webkit-scrollbar-track {
+  margin:4px 12px 12px 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+} 
