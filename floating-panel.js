@@ -296,7 +296,7 @@ function selectRange(index) {
 // Drag & Resize Utils
 function setupDrag(element, handle) {
     let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
+    let startX, startY, initialRight, initialTop;
     let hasMoved = false;
 
     handle.addEventListener('mousedown', (e) => {
@@ -308,11 +308,13 @@ function setupDrag(element, handle) {
         startY = e.clientY;
 
         const rect = element.getBoundingClientRect();
-        initialLeft = rect.left;
+        // Calculate initial distance from right edge
+        // Use document.documentElement.clientWidth to exclude vertical scrollbar width
+        initialRight = document.documentElement.clientWidth - rect.right;
         initialTop = rect.top;
 
-        element.style.right = 'auto';
-        element.style.left = initialLeft + 'px';
+        element.style.left = 'auto'; // Ensure left is auto
+        element.style.right = initialRight + 'px';
         element.style.top = initialTop + 'px';
 
         document.addEventListener('mousemove', onMouseMove);
@@ -325,7 +327,8 @@ function setupDrag(element, handle) {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
 
-        element.style.left = `${initialLeft + dx}px`;
+        // Update top and right (moving right decreases the 'right' value)
+        element.style.right = `${initialRight - dx}px`;
         element.style.top = `${initialTop + dy}px`;
     }
 
@@ -338,7 +341,7 @@ function setupDrag(element, handle) {
 
 function setupResize(element, handle) {
     let isResizing = false;
-    let startX, startY, initialWidth, initialHeight;
+    let startX, startY, initialWidth, initialHeight, initialRight;
 
     handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -349,6 +352,7 @@ function setupResize(element, handle) {
         const rect = element.getBoundingClientRect();
         initialWidth = rect.width;
         initialHeight = rect.height;
+        initialRight = document.documentElement.clientWidth - rect.right;
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
@@ -359,8 +363,19 @@ function setupResize(element, handle) {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
 
-        element.style.width = `${Math.max(200, initialWidth + dx)}px`;
-        element.style.height = `${Math.max(150, initialHeight + dy)}px`;
+        const newWidth = Math.max(200, initialWidth + dx);
+        const newHeight = Math.max(150, initialHeight + dy);
+
+        // Calculate expected change in width to adjust right position
+        const widthChange = newWidth - initialWidth;
+
+        element.style.width = `${newWidth}px`;
+        element.style.height = `${newHeight}px`;
+
+        // Adjust right so the expansion happens towards the right (mouse direction)
+        // instead of towards the left (default behavior for right-anchored elements)
+        element.style.right = `${initialRight - widthChange}px`;
+        element.style.left = 'auto';
     }
 
     function onMouseUp() {
