@@ -81,10 +81,10 @@ async function createPanelUI(initialState = null) {
     overlayContainer.style.position = 'fixed';
 
     // Use stored state or defaults
-    overlayContainer.style.top = initialState?.top || '100px';
+    overlayContainer.style.top = initialState?.top || '50px';
     overlayContainer.style.right = initialState?.right || '20px';
     overlayContainer.style.width = initialState?.width || '300px';
-    overlayContainer.style.height = initialState?.height || '400px';
+    overlayContainer.style.height = initialState?.height || '500px';
 
     overlayContainer.style.zIndex = '2147483647'; // Max z-index
     overlayContainer.style.display = 'block';
