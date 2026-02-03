@@ -314,21 +314,32 @@ function selectRange(index) {
 function setupDrag(element, handle) {
     let isDragging = false;
     let startX, startY, initialRight, initialTop;
-    let hasMoved = false;
 
     handle.addEventListener('mousedown', (e) => {
         if (e.target.closest('button')) return;
 
         isDragging = true;
-        hasMoved = false;
         startX = e.clientX;
         startY = e.clientY;
 
-        const rect = element.getBoundingClientRect();
-        // Calculate initial distance from right edge
-        // Use document.documentElement.clientWidth to exclude vertical scrollbar width
-        initialRight = document.documentElement.clientWidth - rect.right;
-        initialTop = rect.top;
+        // Position Fix: Prefer computed style or inline style to avoid sub-pixel drift
+        // from getBoundingClientRect mixed with clientWidth.
+        const styleRight = element.style.right;
+        const styleTop = element.style.top;
+
+        if (styleRight && styleRight.endsWith('px')) {
+            initialRight = parseFloat(styleRight);
+        } else {
+            const rect = element.getBoundingClientRect();
+            initialRight = document.documentElement.clientWidth - rect.right;
+        }
+
+        if (styleTop && styleTop.endsWith('px')) {
+            initialTop = parseFloat(styleTop);
+        } else {
+            const rect = element.getBoundingClientRect();
+            initialTop = rect.top;
+        }
 
         element.style.left = 'auto'; // Ensure left is auto
         element.style.right = initialRight + 'px';
@@ -369,7 +380,14 @@ function setupResize(element, handle) {
         const rect = element.getBoundingClientRect();
         initialWidth = rect.width;
         initialHeight = rect.height;
-        initialRight = document.documentElement.clientWidth - rect.right;
+
+        // Fix: Use inline style for right to prevent drift
+        const styleRight = element.style.right;
+        if (styleRight && styleRight.endsWith('px')) {
+            initialRight = parseFloat(styleRight);
+        } else {
+            initialRight = document.documentElement.clientWidth - rect.right;
+        }
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
