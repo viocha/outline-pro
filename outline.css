@@ -230,7 +230,7 @@ header {
 }
 
 #toc-container::-webkit-scrollbar-track {
-  margin: 4px 12px 12px 4px;
+  margin: 4px 15px 15px 4px;
   /* Floating Mode */
 }
 
@@ -249,8 +249,9 @@ body #toc-container::-webkit-scrollbar-track {
   background: #aaa;
 }
 
-/* 在 Host 级别阻断外部的自定义滚动条 */
+/* 在 Host 级别阻断外部的 scrollbar-* 定义的滚动条 */
 :host {
   scrollbar-width: auto;
   scrollbar-color: auto;
+  scrollbar-gutter: auto;
 }
