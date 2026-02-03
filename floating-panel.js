@@ -163,8 +163,8 @@ async function createPanelUI(initialState = null) {
     .resizer::after {
       content: '';
       position: absolute;
-      bottom: 2px;
-      right: 2px;
+      bottom: 1px;
+      right: 1px;
       width: 16px;
       height: 16px;
       -webkit-mask-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg%20viewBox%3D%220%200%2012%2012%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M8%2010L10%208M4%2010L10%204%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E');

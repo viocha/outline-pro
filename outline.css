@@ -248,3 +248,9 @@ body #toc-container::-webkit-scrollbar-track {
 #toc-container::-webkit-scrollbar-thumb:hover {
   background: #aaa;
 }
+
+/* 在 Host 级别阻断外部的自定义滚动条 */
+:host {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
