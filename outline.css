@@ -224,21 +224,27 @@ header {
 }
 
 /* Custom Scrollbar Styles */
-::-webkit-scrollbar {
+#toc-container::-webkit-scrollbar {
   width: 6px;
   height: 6px;
-} 
-
-::-webkit-scrollbar-track {
-  margin:4px 12px 12px 4px;
 }
 
-::-webkit-scrollbar-thumb {
+#toc-container::-webkit-scrollbar-track {
+  margin: 4px 12px 12px 4px;
+  /* Floating Mode */
+}
+
+/* Sidebar Mode */
+body #toc-container::-webkit-scrollbar-track {
+  margin: 4px;
+}
+
+#toc-container::-webkit-scrollbar-thumb {
   background: #ccc;
   border-radius: 3px;
   transition: background 0.2s;
 }
 
-::-webkit-scrollbar-thumb:hover {
+#toc-container::-webkit-scrollbar-thumb:hover {
   background: #aaa;
-} 
+}
