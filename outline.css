@@ -162,29 +162,28 @@ header {
 }
 
 .toc-text {
-  font-size: 13.5px;
   white-space: nowrap;
   transition: color 0.1s;
 }
 
-.level-1>.toc-header>.toc-text {
+.level-1>.toc-header>.toc-text,
+.level-2>.toc-header>.toc-text {
   font-size: 14px;
 }
 
-.level-2>.toc-header>.toc-text {
+.level-3>.toc-header>.toc-text,
+.level-4>.toc-header>.toc-text {
   font-size: 13.5px;
 }
 
-.level-3>.toc-header>.toc-text,
-.level-4>.toc-header>.toc-text,
 .level-5>.toc-header>.toc-text,
 .level-6>.toc-header>.toc-text {
   font-size: 13px;
 }
 
 .toggle-icon {
-  width: 24px;
-  height: 24px;
+  width: 1.2em;
+  height: 1.2em;
   flex-shrink: 0;
   display: flex;
   align-items: center;
