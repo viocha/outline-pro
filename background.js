@@ -141,6 +141,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // Cleanup state when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  const key = `floating_state_${tabId}`;
   chrome.storage.local.remove(key);
+});
+
+// Inherit state from opener tab (if opened via link/context menu)
+chrome.tabs.onCreated.addListener((tab) => {
+  if (tab.openerTabId) {
+    const openerKey = `floating_state_${tab.openerTabId}`;
+    chrome.storage.local.get(openerKey, (data) => {
+      const openerState = data[openerKey];
+      if (openerState && openerState.isVisible) {
+        // Copy state to new tab
+        const newKey = `floating_state_${tab.id}`;
+        chrome.storage.local.set({ [newKey]: openerState });
+      }
+    });
+  }
 });
