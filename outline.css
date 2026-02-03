@@ -167,17 +167,17 @@ header {
 
 .level-1>.toc-header>.toc-text,
 .level-2>.toc-header>.toc-text {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .level-3>.toc-header>.toc-text,
 .level-4>.toc-header>.toc-text {
-  font-size: 13.5px;
+  font-size: 12.5px;
 }
 
 .level-5>.toc-header>.toc-text,
 .level-6>.toc-header>.toc-text {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .toggle-icon {
