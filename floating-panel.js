@@ -159,23 +159,14 @@ async function createPanelUI(initialState = null) {
       cursor: se-resize;
       z-index: 20;
     }
-    /* Visual mark */
-    .resizer::after {
-      content: '';
+    .resizer-bl {
+      width: 24px;
+      height: 24px;
       position: absolute;
-      bottom: 1px;
-      right: 1px;
-      width: 16px;
-      height: 16px;
-      -webkit-mask-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg%20viewBox%3D%220%200%2012%2012%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M8%2010L10%208M4%2010L10%204%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E');
-      -webkit-mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      -webkit-mask-size: 100% 100%;
-      background-color: #ccc;
-      transition: background-color 0.2s;
-    }
-    .resizer:hover::after {
-      background-color: #aaa;
+      bottom: 0;
+      left: 0;
+      cursor: sw-resize;
+      z-index: 20;
     }
   `;
     shadowRoot.appendChild(style);
@@ -228,6 +219,7 @@ async function createPanelUI(initialState = null) {
       <div style="padding: 20px; color:#999; text-align:center; font-size:13px;">正在加载...</div>
     </div>
     <div class="resizer"></div>
+    <div class="resizer-bl"></div>
   `;
     shadowRoot.appendChild(wrapper);
     document.body.appendChild(overlayContainer);
@@ -279,6 +271,7 @@ async function createPanelUI(initialState = null) {
 
         // Resize Logic
         setupResize(overlayContainer, wrapper.querySelector('.resizer'));
+        setupResizeBL(overlayContainer, wrapper.querySelector('.resizer-bl'));
 
     } catch (e) {
         console.error("Failed to load renderer", e);
@@ -449,6 +442,52 @@ function setupResize(element, handle) {
         // instead of towards the left (default behavior for right-anchored elements)
         element.style.right = `${initialRight - widthChange}px`;
         element.style.left = 'auto';
+    }
+
+    function onMouseUp() {
+        isResizing = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        savePanelState();
+    }
+}
+
+function setupResizeBL(element, handle) {
+    let isResizing = false;
+    let startX, startY, initialWidth, initialHeight;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rect = element.getBoundingClientRect();
+        initialWidth = rect.width;
+        initialHeight = rect.height;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    function onMouseMove(e) {
+        if (!isResizing) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        // Bottom-Left Resize:
+        // Dragging left (negative dx) -> Increases Width
+        // Dragging right (positive dx) -> Decreases Width
+        // Dragging down (positive dy) -> Increases Height (Same as BR)
+
+        const newWidth = Math.max(200, initialWidth - dx);
+        const newHeight = Math.max(150, initialHeight + dy);
+
+        element.style.width = `${newWidth}px`;
+        element.style.height = `${newHeight}px`;
+
+        // Since element is right-anchored, increasing width naturally grows to the left.
+        // No need to adjust 'right' property.
     }
 
     function onMouseUp() {

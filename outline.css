@@ -230,8 +230,7 @@ header {
 }
 
 #toc-container::-webkit-scrollbar-track {
-  margin: 4px 15px 15px 4px;
-  /* Floating Mode */
+  margin: 4px;
 }
 
 /* Sidebar Mode */
