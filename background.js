@@ -146,16 +146,31 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // Inherit state from opener tab (if opened via link/context menu)
-chrome.tabs.onCreated.addListener((tab) => {
+chrome.tabs.onCreated.addListener(async (tab) => {
   if (tab.openerTabId) {
-    const openerKey = `floating_state_${tab.openerTabId}`;
-    chrome.storage.local.get(openerKey, (data) => {
-      const openerState = data[openerKey];
-      if (openerState && openerState.isVisible) {
-        // Copy state to new tab
-        const newKey = `floating_state_${tab.id}`;
-        chrome.storage.local.set({ [newKey]: openerState });
+    try {
+      const openerTab = await chrome.tabs.get(tab.openerTabId);
+
+      const getHost = (url) => {
+        try { return new URL(url).host; } catch (e) { return null; }
+      };
+
+      const openerHost = getHost(openerTab.url);
+      const newTabHost = getHost(tab.pendingUrl || tab.url);
+
+      if (openerHost && newTabHost && openerHost === newTabHost) {
+        const openerKey = `floating_state_${tab.openerTabId}`;
+        const data = await chrome.storage.local.get(openerKey);
+        const openerState = data[openerKey];
+
+        if (openerState && openerState.isVisible) {
+          // Copy state to new tab
+          const newKey = `floating_state_${tab.id}`;
+          await chrome.storage.local.set({ [newKey]: openerState });
+        }
       }
-    });
+    } catch (e) {
+      // Ignore errors (e.g. invalid URLs or access issues)
+    }
   }
 });
