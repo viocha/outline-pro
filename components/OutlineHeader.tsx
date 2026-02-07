@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { HeadingItem } from '@/lib/types';
+import { type HeadingItem, buildTree, type TreeNode } from '@/lib/types';
 
 interface OutlineHeaderProps {
   mode: 'sidepanel' | 'floating';
@@ -52,11 +52,21 @@ export default function OutlineHeader({
   });
   const levelLimit = Math.max(maxLevel, 1);
 
-  // Calculate max children count for smart collapse thresholds
-  // We approximate by checking heading counts per parent
+  // Build tree and find the max children count across all nodes
+  const tree = buildTree(headings);
+  function getMaxChildrenCount(nodes: TreeNode[]): number {
+    let max = 0;
+    for (const node of nodes) {
+      if (node.children.length > max) max = node.children.length;
+      const childMax = getMaxChildrenCount(node.children);
+      if (childMax > max) max = childMax;
+    }
+    return max;
+  }
+  const maxChildren = Math.max(tree.length, getMaxChildrenCount(tree));
   const allThresholds = [10, 20, 30, 40, 50];
-  // Simple heuristic: show thresholds if total headings exceed them
-  const validThresholds = allThresholds.filter((t) => headings.length > t);
+  // Only show thresholds that are less than the max children count
+  const validThresholds = allThresholds.filter((t) => maxChildren > t);
 
   return (
     <header
