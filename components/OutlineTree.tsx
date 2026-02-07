@@ -199,10 +199,9 @@ function TreeNodeItem({
       {/* Header row */}
       <div
         className={cn(
-          'flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
+          'group flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
           'hover:bg-bg-hover',
           'min-w-full w-fit box-border',
-          isLeaf && 'hover:text-primary',
         )}
         style={{ paddingLeft: 0 }}
         onClick={handleHeaderClick}
@@ -227,7 +226,7 @@ function TreeNodeItem({
         <div
           className={cn(
             'whitespace-nowrap transition-colors duration-100 leading-[1.4] text-[#444]',
-            'hover:text-primary',
+            isLeaf ? 'group-hover:text-primary' : 'hover:text-primary',
             fontSizeClass,
           )}
           title={node.heading.text}
