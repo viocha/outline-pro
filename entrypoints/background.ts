@@ -6,18 +6,8 @@ export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({
-        id: 'open_sidebar',
-        title: 'Open Sidebar Outline',
-        contexts: ['page', 'selection', 'link', 'editable'],
-      });
-      chrome.contextMenus.create({
-        id: 'open_floating_page',
-        title: 'Open Floating Outline',
-        contexts: ['page', 'selection', 'link', 'editable'],
-      });
-      chrome.contextMenus.create({
-        id: 'open_floating_action',
-        title: 'Open Floating Outline',
+        id: 'toggle_floating_action',
+        title: '切换浮动大纲',
         contexts: ['action'],
       });
     });
@@ -26,14 +16,9 @@ export default defineBackground(() => {
   // Handle Context Menu Clicks
   chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (!tab?.id) return;
-    if (info.menuItemId === 'open_sidebar') {
-      openSidePanel(tab);
-    } else if (
-      info.menuItemId === 'open_floating_page' ||
-      info.menuItemId === 'open_floating_action'
-    ) {
+    if (info.menuItemId === 'toggle_floating_action') {
       chrome.runtime.sendMessage({ action: 'CLOSE_SIDEPANEL' }).catch(() => {});
-      toggleFloatingPanel(tab.id, 'SHOW_FLOATING_PANEL');
+      toggleFloatingPanel(tab.id, 'TOGGLE_FLOATING_PANEL');
     }
   });
 
