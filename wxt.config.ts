@@ -7,14 +7,21 @@ export default defineConfig({
   manifest: {
     name: 'Outline Pro',
     description:
-      'Smart outline generator with Sidebar and Floating modes for easy navigation.',
+      '智能大纲生成器，支持侧栏和悬浮两种模式，轻松导航页面内容。',
     version: '2.0.0',
     permissions: ['sidePanel', 'scripting', 'contextMenus', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*', 'file://*/*'],
+    action: {
+      default_title: 'Open Outline Pro',
+    },
     commands: {
+      _execute_action: {
+        suggested_key: { default: 'Alt+Shift+Q' },
+        description: '切换大纲侧栏面板',
+      },
       'toggle-floating-outline': {
         suggested_key: { default: 'Alt+Q' },
-        description: 'Toggle Floating Outline',
+        description: '切换大纲悬浮面板',
       },
     },
   },
