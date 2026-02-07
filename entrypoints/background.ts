@@ -109,32 +109,54 @@ export default defineBackground(() => {
   });
 
   // Inherit state from opener tab (same host)
-  chrome.tabs.onCreated.addListener(async (tab) => {
-    if (tab.openerTabId) {
-      try {
-        const openerTab = await chrome.tabs.get(tab.openerTabId);
-				debugger;
-        const getHost = (url?: string) => {
-          try {
-            return url ? new URL(url).host : null;
-          } catch {
-            return null;
-          }
-        };
-        const openerHost = getHost(openerTab.url);
-        const newTabHost = getHost(tab.pendingUrl || tab.url);
-        if (openerHost && newTabHost && openerHost === newTabHost) {
-          const openerKey = `floating_state_${tab.openerTabId}`;
-          const data = await chrome.storage.local.get(openerKey);
-          const openerState = data[openerKey];
-          if (openerState?.isVisible && tab.id) {
-            const newKey = `floating_state_${tab.id}`;
-            await chrome.storage.local.set({ [newKey]: openerState });
-          }
+  const getHost = (url?: string) => {
+    try {
+      return url ? new URL(url).host : null;
+    } catch {
+      return null;
+    }
+  };
+
+  async function tryInheritState(tabId: number, openerTabId: number, newTabUrl: string) {
+    try {
+      const openerTab = await chrome.tabs.get(openerTabId);
+      const openerHost = getHost(openerTab.url);
+      const newTabHost = getHost(newTabUrl);
+      if (openerHost && newTabHost && openerHost === newTabHost) {
+        const openerKey = `floating_state_${openerTabId}`;
+        const data = await chrome.storage.local.get(openerKey);
+        const openerState = data[openerKey];
+        if (openerState?.isVisible) {
+          const newKey = `floating_state_${tabId}`;
+          await chrome.storage.local.set({ [newKey]: openerState });
         }
-      } catch {
-        // ignore
       }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Track tabs that need deferred URL resolution
+  const pendingInheritTabs = new Map<number, number>(); // tabId -> openerTabId
+
+  chrome.tabs.onCreated.addListener(async (tab) => {
+    if (!tab.openerTabId || !tab.id) return;
+
+    const knownUrl = tab.pendingUrl || tab.url;
+    if (knownUrl) {
+      // URL already available (e.g. right-click "Open in new tab")
+      await tryInheritState(tab.id, tab.openerTabId, knownUrl);
+    } else {
+      // URL not yet available (e.g. target="_blank" link), defer to onUpdated
+      pendingInheritTabs.set(tab.id, tab.openerTabId);
+    }
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.url && pendingInheritTabs.has(tabId)) {
+      const openerTabId = pendingInheritTabs.get(tabId)!;
+      pendingInheritTabs.delete(tabId);
+      tryInheritState(tabId, openerTabId, changeInfo.url);
     }
   });
 
