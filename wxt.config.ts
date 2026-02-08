@@ -8,7 +8,6 @@ export default defineConfig({
     name: 'Outline Pro',
     description:
       '智能大纲生成器，支持侧栏和悬浮两种模式，轻松导航页面内容。',
-    version: '2.0.0',
     permissions: ['sidePanel', 'scripting', 'contextMenus', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*', 'file://*/*'],
     action: {
