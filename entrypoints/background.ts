@@ -152,7 +152,35 @@ export default defineBackground(() => {
       .catch((err) => console.error('Failed to open side panel', err));
   }
 
-  function toggleFloatingPanel(tabId: number, actionType: string) {
+  const RESTRICTED_URL_PREFIXES = [
+    'chrome://',
+    'edge://',
+    'about:',
+    'chrome-extension://',
+    'extension://',
+    'devtools://',
+    'view-source:',
+    'data:',
+    'file://',
+  ];
+
+  function isRestrictedUrl(url?: string): boolean {
+    if (!url) return true;
+    return RESTRICTED_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
+  }
+
+  async function toggleFloatingPanel(tabId: number, actionType: string) {
+    // Check if the tab URL is restricted before attempting injection
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (isRestrictedUrl(tab.url)) {
+        console.log('Floating panel is not supported on this page:', tab.url);
+        return;
+      }
+    } catch {
+      return;
+    }
+
     chrome.tabs.sendMessage(tabId, { action: actionType }).catch(async (err) => {
       if (actionType === 'HIDE_FLOATING_PANEL') return;
       console.log('Floating panel script not ready, injecting...', err);
