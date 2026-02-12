@@ -138,11 +138,31 @@ export default function SidePanel() {
     };
 
     const tabUpdatedListener = (
-      _id: number,
+      tabId: number,
       info: chrome.tabs.TabChangeInfo,
       tab: chrome.tabs.Tab,
     ) => {
-      if (info.status === 'complete' && tab.active) debouncedRefresh();
+      if (!tab.active) return;
+
+      if (info.url) {
+        // URL changed: inject a DOMContentLoaded-time notifier.
+        // executeScript without injectImmediately runs at document_idle
+        // (after DOMContentLoaded, before load), so the outline updates
+        // as soon as text is rendered, without waiting for images/styles.
+        chrome.scripting
+          .executeScript({
+            target: { tabId },
+            func: () => {
+              chrome.runtime.sendMessage({ action: 'AUTO_REFRESH' }).catch(() => {});
+            },
+          })
+          .catch(() => {});
+      }
+
+      // Keep 'complete' as fallback for pages that add headings late
+      if (info.status === 'complete') {
+        debouncedRefresh();
+      }
     };
 
     const tabActivatedListener = () => debouncedRefresh();
