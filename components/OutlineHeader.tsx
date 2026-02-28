@@ -84,7 +84,7 @@ export default function OutlineHeader({
         Outline
       </div>
 
-      <div className="flex gap-0.5 items-center">
+      <div className="flex gap-0.5 items-center cursor-default">
         {/* Switch mode button */}
         <Button
           variant="ghost"
