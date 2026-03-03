@@ -2,7 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import OutlineHeader from '@/components/OutlineHeader';
 import OutlineTree, { type OutlineTreeRef } from '@/components/OutlineTree';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { normalizeHeadings, type HeadingItem } from '@/lib/types';
+import {
+  normalizeHeadings,
+  type HeadingItem,
+  type Settings,
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+} from '@/lib/types';
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   let timer: ReturnType<typeof setTimeout>;
@@ -16,9 +23,16 @@ export default function SidePanel() {
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
   const treeRef = useRef<OutlineTreeRef>(null);
   const currentTabIdRef = useRef<number | null>(null);
   const initialSmartCollapseDone = useRef(false);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    loadSettings().then(setSettings);
+  }, []);
 
   const refreshTOC = useCallback(async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -126,6 +140,61 @@ export default function SidePanel() {
     }
   }, []);
 
+  const toggleAutoHighlight = useCallback(() => {
+    setSettings((prev) => {
+      const next = { ...prev, autoHighlightActive: !prev.autoHighlightActive };
+      saveSettings(next);
+      if (!next.autoHighlightActive) setActiveIndex(-1);
+      return next;
+    });
+  }, []);
+
+  // Detect which heading is currently in view (sidepanel runs in extension context)
+  useEffect(() => {
+    if (!settings.autoHighlightActive || currentTabIdRef.current === null) {
+      setActiveIndex(-1);
+      return;
+    }
+
+    let rafId: ReturnType<typeof setTimeout>;
+    const pollActive = () => {
+      if (currentTabIdRef.current === null) return;
+      chrome.scripting
+        .executeScript({
+          target: { tabId: currentTabIdRef.current },
+          func: () => {
+            const els = Array.from(
+              document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+            ) as HTMLElement[];
+            if (els.length === 0) return -1;
+            // Find the last heading whose top is at or above 20% of viewport
+            const threshold = window.innerHeight * 0.2;
+            let active = 0;
+            for (let i = 0; i < els.length; i++) {
+              const rect = els[i].getBoundingClientRect();
+              if (rect.top <= threshold) {
+                active = i;
+              } else {
+                break;
+              }
+            }
+            return active;
+          },
+        })
+        .then((results: { result: unknown }[]) => {
+          const idx = results?.[0]?.result;
+          if (typeof idx === 'number' && idx >= 0) {
+            setActiveIndex(idx);
+          }
+        })
+        .catch(() => {});
+      rafId = setTimeout(pollActive, 300);
+    };
+
+    pollActive();
+    return () => clearTimeout(rafId);
+  }, [settings.autoHighlightActive, headings]);
+
   // Initial load and event listeners
   useEffect(() => {
     refreshTOC();
@@ -185,12 +254,14 @@ export default function SidePanel() {
         mode="sidepanel"
         headings={headings}
         isRefreshing={isRefreshing}
+        autoHighlightActive={settings.autoHighlightActive}
         onRefresh={refreshTOC}
         onCollapseAll={() => treeRef.current?.collapseAll()}
         onExpandAll={() => treeRef.current?.expandAll()}
         onExpandToLevel={(level) => treeRef.current?.expandToLevel(level)}
         onSmartCollapse={(threshold) => treeRef.current?.smartCollapse(threshold)}
         onSwitchMode={switchToFloating}
+        onToggleAutoHighlight={toggleAutoHighlight}
       />
       <ScrollArea className="flex-1">
         {error ? (
@@ -199,6 +270,7 @@ export default function SidePanel() {
           <OutlineTree
             ref={treeRef}
             headings={headings}
+            activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             onJump={jumpTo}
             onHighlight={selectRange}
           />

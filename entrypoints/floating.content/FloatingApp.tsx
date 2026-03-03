@@ -2,7 +2,15 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import OutlineHeader from '@/components/OutlineHeader';
 import OutlineTree, { type OutlineTreeRef } from '@/components/OutlineTree';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { normalizeHeadings, type HeadingItem, type FloatingState } from '@/lib/types';
+import {
+  normalizeHeadings,
+  type HeadingItem,
+  type FloatingState,
+  type Settings,
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+} from '@/lib/types';
 import '@/assets/main.css';
 
 interface FloatingAppProps {
@@ -17,11 +25,18 @@ export default function FloatingApp({
   const [visible, setVisible] = useState(false);
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
   const treeRef = useRef<OutlineTreeRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
   const initialSmartCollapseDone = useRef(false);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    loadSettings().then(setSettings);
+  }, []);
 
   // Position state
   const [position, setPosition] = useState({
@@ -210,6 +225,50 @@ export default function FloatingApp({
     chrome.runtime.sendMessage({ action: 'OPEN_SIDEPANEL' });
   }, [hidePanel]);
 
+  const toggleAutoHighlight = useCallback(() => {
+    setSettings((prev) => {
+      const next = { ...prev, autoHighlightActive: !prev.autoHighlightActive };
+      saveSettings(next);
+      if (!next.autoHighlightActive) setActiveIndex(-1);
+      return next;
+    });
+  }, []);
+
+  // Detect which heading is currently in view using scroll polling (floating runs in page context)
+  useEffect(() => {
+    if (!settings.autoHighlightActive || !visible) {
+      setActiveIndex(-1);
+      return;
+    }
+
+    const getActive = () => {
+      const els = Array.from(
+        document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+      ) as HTMLElement[];
+      if (els.length === 0) return -1;
+      const threshold = window.innerHeight * 0.2;
+      let active = 0;
+      for (let i = 0; i < els.length; i++) {
+        const rect = els[i].getBoundingClientRect();
+        if (rect.top <= threshold) {
+          active = i;
+        } else {
+          break;
+        }
+      }
+      return active;
+    };
+
+    const handleScroll = () => {
+      setActiveIndex(getActive());
+    };
+
+    // Set initial value
+    setActiveIndex(getActive());
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [settings.autoHighlightActive, visible, headings]);
+
   // --- Drag logic ---
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
@@ -348,6 +407,7 @@ export default function FloatingApp({
             mode="floating"
             headings={headings}
             isRefreshing={isRefreshing}
+            autoHighlightActive={settings.autoHighlightActive}
             portalContainer={portalContainer}
             onRefresh={refreshTOC}
             onCollapseAll={() => treeRef.current?.collapseAll()}
@@ -357,6 +417,7 @@ export default function FloatingApp({
               treeRef.current?.smartCollapse(threshold)
             }
             onSwitchMode={switchToSidebar}
+            onToggleAutoHighlight={toggleAutoHighlight}
             onClose={hidePanel}
           />
         </div>
@@ -365,6 +426,7 @@ export default function FloatingApp({
           <OutlineTree
             ref={treeRef}
             headings={headings}
+            activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             onJump={jumpTo}
             onHighlight={selectRange}
           />

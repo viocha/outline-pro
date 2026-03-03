@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import {
   Minus,
@@ -23,6 +24,7 @@ interface OutlineHeaderProps {
   mode: 'sidepanel' | 'floating';
   headings: HeadingItem[];
   isRefreshing: boolean;
+  autoHighlightActive: boolean;
   portalContainer?: HTMLElement | null;
   onRefresh: () => void;
   onCollapseAll: () => void;
@@ -30,6 +32,7 @@ interface OutlineHeaderProps {
   onExpandToLevel: (level: number) => void;
   onSmartCollapse: (threshold: number) => void;
   onSwitchMode: () => void;
+  onToggleAutoHighlight: () => void;
   onClose?: () => void;
 }
 
@@ -37,6 +40,7 @@ export default function OutlineHeader({
   mode,
   headings,
   isRefreshing,
+  autoHighlightActive,
   portalContainer,
   onRefresh,
   onCollapseAll,
@@ -44,6 +48,7 @@ export default function OutlineHeader({
   onExpandToLevel,
   onSmartCollapse,
   onSwitchMode,
+  onToggleAutoHighlight,
   onClose,
 }: OutlineHeaderProps) {
   let maxLevel = 0;
@@ -129,6 +134,13 @@ export default function OutlineHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" container={portalContainer}>
+            <DropdownMenuCheckboxItem
+              checked={autoHighlightActive}
+              onCheckedChange={onToggleAutoHighlight}
+            >
+              高亮当前标题
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
             <DropdownMenuLabel>Show Levels</DropdownMenuLabel>
             {Array.from({ length: Math.min(levelLimit, 6) }, (_, i) => i + 1).map(
               (level) => (

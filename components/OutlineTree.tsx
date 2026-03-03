@@ -1,4 +1,4 @@
-import { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TreeNode, HeadingItem } from '@/lib/types';
@@ -13,12 +13,13 @@ export interface OutlineTreeRef {
 
 interface OutlineTreeProps {
   headings: HeadingItem[];
+  activeIndex?: number;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
 }
 
 const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
-  ({ headings, onJump, onHighlight }, ref) => {
+  ({ headings, activeIndex, onJump, onHighlight }, ref) => {
     const [collapsedSet, setCollapsedSet] = useState<Set<number>>(new Set());
     const tree = buildTree(headings);
 
@@ -132,6 +133,7 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
             key={node.index}
             node={node}
             collapsedSet={collapsedSet}
+            activeIndex={activeIndex}
             onToggle={toggleCollapse}
             onJump={onJump}
             onHighlight={onHighlight}
@@ -146,6 +148,7 @@ OutlineTree.displayName = 'OutlineTree';
 interface TreeNodeItemProps {
   node: TreeNode;
   collapsedSet: Set<number>;
+  activeIndex?: number;
   onToggle: (index: number) => void;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
@@ -154,13 +157,48 @@ interface TreeNodeItemProps {
 function TreeNodeItem({
   node,
   collapsedSet,
+  activeIndex,
   onToggle,
   onJump,
   onHighlight,
 }: TreeNodeItemProps) {
   const isLeaf = node.children.length === 0;
   const isCollapsed = collapsedSet.has(node.index);
+  const isActive = activeIndex === node.index;
   const level = node.heading.level;
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Scroll into view (vertical only) when this item becomes active
+  useEffect(() => {
+    if (!isActive || !rowRef.current) return;
+    const el = rowRef.current;
+
+    // Find the nearest vertically scrollable ancestor
+    const findScrollParent = (node: HTMLElement | null): HTMLElement | null => {
+      if (!node) return null;
+      const { overflowY } = getComputedStyle(node);
+      if (
+        (overflowY === 'scroll' || overflowY === 'auto') &&
+        node.scrollHeight > node.clientHeight
+      ) {
+        return node;
+      }
+      return findScrollParent(node.parentElement);
+    };
+
+    const scrollParent = findScrollParent(el.parentElement);
+    if (!scrollParent) return;
+
+    const parentRect = scrollParent.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const pad = 6;
+
+    if (elRect.top < parentRect.top + pad) {
+      scrollParent.scrollBy({ top: -(parentRect.top - elRect.top + pad), behavior: 'smooth' });
+    } else if (elRect.bottom > parentRect.bottom - pad) {
+      scrollParent.scrollBy({ top: elRect.bottom - parentRect.bottom + pad, behavior: 'smooth' });
+    }
+  }, [isActive]);
 
   const fontSizeClass =
     level <= 2
@@ -198,10 +236,12 @@ function TreeNodeItem({
     <div className="flex flex-col">
       {/* Header row */}
       <div
+        ref={rowRef}
         className={cn(
           'group flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
-          'hover:bg-bg-hover',
           'min-w-full w-fit box-border',
+          isActive ? 'bg-emerald-100/20' : '',
+          'hover:bg-bg-hover',
         )}
         style={{ paddingLeft: 0 }}
         onClick={handleHeaderClick}
@@ -247,6 +287,7 @@ function TreeNodeItem({
               key={child.index}
               node={child}
               collapsedSet={collapsedSet}
+              activeIndex={activeIndex}
               onToggle={onToggle}
               onJump={onJump}
               onHighlight={onHighlight}

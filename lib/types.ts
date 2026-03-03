@@ -54,3 +54,28 @@ export type FloatingState = {
   width: string;
   height: string;
 };
+
+export interface Settings {
+  /** 是否自动高亮目录中当前浏览的标题 */
+  autoHighlightActive: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  autoHighlightActive: true,
+};
+
+const SETTINGS_KEY = 'outline_pro_settings';
+
+export async function loadSettings(): Promise<Settings> {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(SETTINGS_KEY, (data) => {
+      resolve({ ...DEFAULT_SETTINGS, ...(data[SETTINGS_KEY] ?? {}) });
+    });
+  });
+}
+
+export async function saveSettings(settings: Settings): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ [SETTINGS_KEY]: settings }, resolve);
+  });
+}
