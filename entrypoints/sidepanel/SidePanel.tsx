@@ -9,6 +9,12 @@ import {
   DEFAULT_SETTINGS,
   loadSettings,
   saveSettings,
+  SETTINGS_KEY,
+  headingsFingerprint,
+  loadCollapseState,
+  saveCollapseState,
+  loadScrollState,
+  saveScrollState,
 } from '@/lib/types';
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
@@ -25,16 +31,35 @@ export default function SidePanel() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [collapsedSet, setCollapsedSet] = useState<Set<number>>(new Set());
   const treeRef = useRef<OutlineTreeRef>(null);
   const currentTabIdRef = useRef<number | null>(null);
-  const initialSmartCollapseDone = useRef(false);
+  const headingsFpRef = useRef('');
+  // Only true when the next headings effect should restore saved state
+  // (initial silent load with unchanged headings). Non-silent calls (tab update,
+  // mutation, manual refresh) keep this false so state is always reset.
+  const shouldRestoreRef = useRef(false);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const [pendingScrollTop, setPendingScrollTop] = useState<number | null>(null);
 
   // Load persisted settings on mount
   useEffect(() => {
     loadSettings().then(setSettings);
   }, []);
 
-  const refreshTOC = useCallback(async () => {
+  // Sync settings changes from other panels
+  useEffect(() => {
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'sync' && changes[SETTINGS_KEY]) {
+        const newValue = changes[SETTINGS_KEY].newValue;
+        if (newValue) setSettings({ ...DEFAULT_SETTINGS, ...newValue });
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
+
+  const refreshTOC = useCallback(async (opts: { silent?: boolean } = {}) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (
       !tab?.url ||
@@ -46,9 +71,9 @@ export default function SidePanel() {
       return;
     }
     currentTabIdRef.current = tab.id!;
-    setIsRefreshing(true);
     setError(null);
 
+    let willSpin = false;
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id! },
@@ -66,8 +91,16 @@ export default function SidePanel() {
 
       if (results?.[0]?.result) {
         const normalized = normalizeHeadings(results[0].result);
+        if (!opts.silent) {
+          willSpin = true;
+        } else {
+          const saved = await loadCollapseState();
+          willSpin = saved?.fingerprint !== headingsFingerprint(normalized);
+        }
+        // Restore saved state only on silent+unchanged open; reset on any real refresh
+        shouldRestoreRef.current = !willSpin;
+        if (willSpin) setIsRefreshing(true);
         setHeadings(normalized);
-        initialSmartCollapseDone.current = false;
       } else {
         setHeadings([]);
         setError('未发现标题大纲');
@@ -83,16 +116,83 @@ export default function SidePanel() {
       setError('无法读取页面');
       setHeadings([]);
     } finally {
-      setTimeout(() => setIsRefreshing(false), 500);
+      if (willSpin) setTimeout(() => setIsRefreshing(false), 500);
     }
   }, []);
 
-  // After headings update, apply smart collapse
+  // Restore or reset when headings change
   useEffect(() => {
-    if (headings.length > 0 && !initialSmartCollapseDone.current && treeRef.current) {
-      treeRef.current.smartCollapse(50);
-      initialSmartCollapseDone.current = true;
+    if (headings.length === 0) {
+      setCollapsedSet(new Set());
+      setPendingScrollTop(null);
+      return;
     }
+    const fp = headingsFingerprint(headings);
+    headingsFpRef.current = fp;
+
+    const shouldRestore = shouldRestoreRef.current;
+    shouldRestoreRef.current = false;
+
+    if (shouldRestore) {
+      // Panel opened with unchanged headings → restore saved collapse + scroll
+      Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
+        if (collapse?.fingerprint === fp) {
+          setCollapsedSet(new Set(collapse.collapsed));
+          if (scroll?.fingerprint === fp) setPendingScrollTop(scroll.scrollTop);
+        } else if (treeRef.current) {
+          treeRef.current.smartCollapse(50);
+        }
+      });
+    } else {
+      // Tab navigated / refreshed / heading mutation → reset to default
+      setPendingScrollTop(null);
+      const vp = scrollViewportRef.current;
+      if (vp) vp.scrollTop = 0;
+      if (treeRef.current) {
+        treeRef.current.smartCollapse(50);
+      } else {
+        setCollapsedSet(new Set());
+      }
+    }
+  }, [headings]);
+
+  // Persist collapse state on every change
+  useEffect(() => {
+    const fp = headingsFpRef.current;
+    if (!fp) return;
+    saveCollapseState({ fingerprint: fp, collapsed: Array.from(collapsedSet) });
+  }, [collapsedSet]);
+
+  // Apply pending scroll restore via rAF so the DOM is fully laid out
+  useEffect(() => {
+    if (pendingScrollTop === null) return;
+    const vp = scrollViewportRef.current;
+    if (!vp) return;
+    const raf = requestAnimationFrame(() => {
+      vp.scrollTop = pendingScrollTop;
+      setPendingScrollTop(null);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingScrollTop]);
+
+  // Persist scroll position (debounced)
+  useEffect(() => {
+    const vp = scrollViewportRef.current;
+    if (!vp) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      const fp = headingsFpRef.current;
+      const scrollTop = vp.scrollTop;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (fp) saveScrollState({ fingerprint: fp, scrollTop });
+      }, 300);
+    };
+    vp.addEventListener('scroll', handler, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      vp.removeEventListener('scroll', handler);
+    };
   }, [headings]);
 
   const jumpTo = useCallback((index: number) => {
@@ -149,6 +249,14 @@ export default function SidePanel() {
     });
   }, []);
 
+  const changeHighlightOpacity = useCallback((v: number) => {
+    setSettings((prev) => {
+      const next = { ...prev, highlightOpacity: v as Settings['highlightOpacity'] };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   // Detect which heading is currently in view (sidepanel runs in extension context)
   useEffect(() => {
     if (!settings.autoHighlightActive || currentTabIdRef.current === null) {
@@ -197,7 +305,7 @@ export default function SidePanel() {
 
   // Initial load and event listeners
   useEffect(() => {
-    refreshTOC();
+    refreshTOC({ silent: true });
 
     const debouncedRefresh = debounce(refreshTOC, 300);
 
@@ -255,6 +363,7 @@ export default function SidePanel() {
         headings={headings}
         isRefreshing={isRefreshing}
         autoHighlightActive={settings.autoHighlightActive}
+        highlightOpacity={settings.highlightOpacity}
         onRefresh={refreshTOC}
         onCollapseAll={() => treeRef.current?.collapseAll()}
         onExpandAll={() => treeRef.current?.expandAll()}
@@ -262,15 +371,19 @@ export default function SidePanel() {
         onSmartCollapse={(threshold) => treeRef.current?.smartCollapse(threshold)}
         onSwitchMode={switchToFloating}
         onToggleAutoHighlight={toggleAutoHighlight}
+        onChangeHighlightOpacity={changeHighlightOpacity}
       />
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
         {error ? (
           <p className="py-4 text-center text-[13px] text-text-dim">{error}</p>
         ) : (
           <OutlineTree
             ref={treeRef}
             headings={headings}
+            collapsedSet={collapsedSet}
+            onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
+            highlightOpacity={settings.highlightOpacity}
             onJump={jumpTo}
             onHighlight={selectRange}
           />

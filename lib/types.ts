@@ -58,13 +58,16 @@ export type FloatingState = {
 export interface Settings {
   /** 是否自动高亮目录中当前浏览的标题 */
   autoHighlightActive: boolean;
+  /** 高亮背景色透明度 (%) */
+  highlightOpacity: 10 | 20 | 30 | 40 | 50;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   autoHighlightActive: true,
+  highlightOpacity: 30,
 };
 
-const SETTINGS_KEY = 'outline_pro_settings';
+export const SETTINGS_KEY = 'outline_pro_settings';
 
 export async function loadSettings(): Promise<Settings> {
   return new Promise((resolve) => {
@@ -77,5 +80,52 @@ export async function loadSettings(): Promise<Settings> {
 export async function saveSettings(settings: Settings): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.sync.set({ [SETTINGS_KEY]: settings }, resolve);
+  });
+}
+
+/** Compute a stable fingerprint for a set of headings */
+export function headingsFingerprint(headings: HeadingItem[]): string {
+  return headings.map((h) => `${h.level}:${h.text}`).join('|');
+}
+
+export interface CollapseState {
+  fingerprint: string;
+  collapsed: number[];
+}
+
+const COLLAPSE_STATE_KEY = 'outline_collapse_state';
+
+export async function loadCollapseState(): Promise<CollapseState | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(COLLAPSE_STATE_KEY, (data) => {
+      resolve((data[COLLAPSE_STATE_KEY] as CollapseState) ?? null);
+    });
+  });
+}
+
+export async function saveCollapseState(state: CollapseState): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [COLLAPSE_STATE_KEY]: state }, resolve);
+  });
+}
+
+export interface ScrollState {
+  fingerprint: string;
+  scrollTop: number;
+}
+
+const SCROLL_STATE_KEY = 'outline_scroll_state';
+
+export async function loadScrollState(): Promise<ScrollState | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(SCROLL_STATE_KEY, (data) => {
+      resolve((data[SCROLL_STATE_KEY] as ScrollState) ?? null);
+    });
+  });
+}
+
+export async function saveScrollState(state: ScrollState): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [SCROLL_STATE_KEY]: state }, resolve);
   });
 }

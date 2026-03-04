@@ -1,8 +1,27 @@
-import { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
+import { useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TreeNode, HeadingItem } from '@/lib/types';
 import { buildTree } from '@/lib/types';
+
+/** Return the indices of all ancestor (non-leaf) nodes of the node with targetIndex */
+function findAncestors(nodes: TreeNode[], targetIndex: number): number[] {
+  const result: number[] = [];
+  const walk = (list: TreeNode[], path: number[]): boolean => {
+    for (const n of list) {
+      if (n.index === targetIndex) {
+        result.push(...path);
+        return true;
+      }
+      if (n.children.length > 0 && walk(n.children, [...path, n.index])) {
+        return true;
+      }
+    }
+    return false;
+  };
+  walk(nodes, []);
+  return result;
+}
 
 export interface OutlineTreeRef {
   collapseAll: () => void;
@@ -13,27 +32,75 @@ export interface OutlineTreeRef {
 
 interface OutlineTreeProps {
   headings: HeadingItem[];
+  collapsedSet: Set<number>;
+  onCollapsedSetChange: (set: Set<number>) => void;
   activeIndex?: number;
+  highlightOpacity?: number;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
 }
 
 const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
-  ({ headings, activeIndex, onJump, onHighlight }, ref) => {
-    const [collapsedSet, setCollapsedSet] = useState<Set<number>>(new Set());
-    const tree = buildTree(headings);
+  ({ headings, collapsedSet, onCollapsedSetChange, activeIndex, highlightOpacity = 30, onJump, onHighlight }, ref) => {
+    const tree = useMemo(() => buildTree(headings), [headings]);
+
+    // Stable refs so the activeIndex effect never captures stale values
+    const collapsedSetRef = useRef(collapsedSet);
+    collapsedSetRef.current = collapsedSet;
+    const onCollapsedSetChangeRef = useRef(onCollapsedSetChange);
+    onCollapsedSetChangeRef.current = onCollapsedSetChange;
+
+    // When the active heading is inside a collapsed subtree, expand all its ancestors
+    useEffect(() => {
+      if (activeIndex === undefined || activeIndex < 0) return;
+      const ancestors = findAncestors(tree, activeIndex);
+      const toExpand = ancestors.filter((i) => collapsedSetRef.current.has(i));
+      if (toExpand.length === 0) return;
+      const next = new Set(collapsedSetRef.current);
+      toExpand.forEach((i) => next.delete(i));
+      onCollapsedSetChangeRef.current(next);
+    }, [activeIndex, tree]);
+
+    // Scroll the active row into view; depends on collapsedSet so it re-fires
+    // after auto-expand settles — preventing the case where the item is
+    // scrolled while still inside a collapsed (invisible) subtree.
+    const containerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (activeIndex === undefined || activeIndex < 0 || !containerRef.current) return;
+      const activeEl = containerRef.current.querySelector('[data-active-row]') as HTMLElement | null;
+      if (!activeEl) return;
+      const raf = requestAnimationFrame(() => {
+        // Skip when the element has no height — it's inside a collapsed div
+        if (activeEl.getBoundingClientRect().height === 0) return;
+        const findScrollParent = (el: HTMLElement | null): HTMLElement | null => {
+          if (!el) return null;
+          const { overflowY } = getComputedStyle(el);
+          if ((overflowY === 'scroll' || overflowY === 'auto') && el.scrollHeight > el.clientHeight) return el;
+          return findScrollParent(el.parentElement);
+        };
+        const scrollParent = findScrollParent(activeEl.parentElement);
+        if (!scrollParent) return;
+        const parentRect = scrollParent.getBoundingClientRect();
+        const elRect = activeEl.getBoundingClientRect();
+        const pad = 6;
+        if (elRect.top < parentRect.top + pad) {
+          scrollParent.scrollBy({ top: -(parentRect.top - elRect.top + pad), behavior: 'smooth' });
+        } else if (elRect.bottom > parentRect.bottom - pad) {
+          scrollParent.scrollBy({ top: elRect.bottom - parentRect.bottom + pad, behavior: 'smooth' });
+        }
+      });
+      return () => cancelAnimationFrame(raf);
+    }, [activeIndex, collapsedSet]);
 
     const toggleCollapse = useCallback((index: number) => {
-      setCollapsedSet((prev) => {
-        const next = new Set(prev);
-        if (next.has(index)) {
-          next.delete(index);
-        } else {
-          next.add(index);
-        }
-        return next;
-      });
-    }, []);
+      const next = new Set(collapsedSet);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      onCollapsedSetChange(next);
+    }, [collapsedSet, onCollapsedSetChange]);
 
     // Get all parent (non-leaf) node indices
     const getParentIndices = useCallback(
@@ -54,12 +121,12 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
     );
 
     const collapseAll = useCallback(() => {
-      setCollapsedSet(new Set(getParentIndices(tree)));
-    }, [tree, getParentIndices]);
+      onCollapsedSetChange(new Set(getParentIndices(tree)));
+    }, [tree, getParentIndices, onCollapsedSetChange]);
 
     const expandAll = useCallback(() => {
-      setCollapsedSet(new Set());
-    }, []);
+      onCollapsedSetChange(new Set());
+    }, [onCollapsedSetChange]);
 
     const expandToLevel = useCallback(
       (targetLevel: number) => {
@@ -75,9 +142,9 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
           }
         };
         walk(tree);
-        setCollapsedSet(newCollapsed);
+        onCollapsedSetChange(newCollapsed);
       },
-      [tree],
+      [tree, onCollapsedSetChange],
     );
 
     const smartCollapse = useCallback(
@@ -104,9 +171,9 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
           }
         };
         walk(tree);
-        setCollapsedSet(newCollapsed);
+        onCollapsedSetChange(newCollapsed);
       },
-      [tree],
+      [tree, onCollapsedSetChange],
     );
 
     useImperativeHandle(
@@ -127,13 +194,14 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
     }
 
     return (
-      <div className="py-1.5">
+      <div ref={containerRef} className="py-1.5">
         {tree.map((node) => (
           <TreeNodeItem
             key={node.index}
             node={node}
             collapsedSet={collapsedSet}
             activeIndex={activeIndex}
+            highlightOpacity={highlightOpacity}
             onToggle={toggleCollapse}
             onJump={onJump}
             onHighlight={onHighlight}
@@ -149,6 +217,7 @@ interface TreeNodeItemProps {
   node: TreeNode;
   collapsedSet: Set<number>;
   activeIndex?: number;
+  highlightOpacity?: number;
   onToggle: (index: number) => void;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
@@ -158,6 +227,7 @@ function TreeNodeItem({
   node,
   collapsedSet,
   activeIndex,
+  highlightOpacity = 30,
   onToggle,
   onJump,
   onHighlight,
@@ -166,39 +236,6 @@ function TreeNodeItem({
   const isCollapsed = collapsedSet.has(node.index);
   const isActive = activeIndex === node.index;
   const level = node.heading.level;
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  // Scroll into view (vertical only) when this item becomes active
-  useEffect(() => {
-    if (!isActive || !rowRef.current) return;
-    const el = rowRef.current;
-
-    // Find the nearest vertically scrollable ancestor
-    const findScrollParent = (node: HTMLElement | null): HTMLElement | null => {
-      if (!node) return null;
-      const { overflowY } = getComputedStyle(node);
-      if (
-        (overflowY === 'scroll' || overflowY === 'auto') &&
-        node.scrollHeight > node.clientHeight
-      ) {
-        return node;
-      }
-      return findScrollParent(node.parentElement);
-    };
-
-    const scrollParent = findScrollParent(el.parentElement);
-    if (!scrollParent) return;
-
-    const parentRect = scrollParent.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const pad = 6;
-
-    if (elRect.top < parentRect.top + pad) {
-      scrollParent.scrollBy({ top: -(parentRect.top - elRect.top + pad), behavior: 'smooth' });
-    } else if (elRect.bottom > parentRect.bottom - pad) {
-      scrollParent.scrollBy({ top: elRect.bottom - parentRect.bottom + pad, behavior: 'smooth' });
-    }
-  }, [isActive]);
 
   const fontSizeClass =
     level <= 2
@@ -236,14 +273,16 @@ function TreeNodeItem({
     <div className="flex flex-col">
       {/* Header row */}
       <div
-        ref={rowRef}
+        data-active-row={isActive ? 'true' : undefined}
         className={cn(
           'group flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
           'min-w-full w-fit box-border',
-          isActive ? 'bg-emerald-100/20' : '',
           'hover:bg-bg-hover',
         )}
-        style={{ paddingLeft: 0 }}
+        style={{
+          paddingLeft: 0,
+          ...(isActive ? { backgroundColor: `rgb(209 250 229 / ${highlightOpacity}%)` } : {}),
+        }}
         onClick={handleHeaderClick}
         onDoubleClick={handleHeaderDblClick}
       >
@@ -288,6 +327,7 @@ function TreeNodeItem({
               node={child}
               collapsedSet={collapsedSet}
               activeIndex={activeIndex}
+              highlightOpacity={highlightOpacity}
               onToggle={onToggle}
               onJump={onJump}
               onHighlight={onHighlight}

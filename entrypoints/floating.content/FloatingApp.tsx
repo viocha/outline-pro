@@ -10,6 +10,12 @@ import {
   DEFAULT_SETTINGS,
   loadSettings,
   saveSettings,
+  SETTINGS_KEY,
+  headingsFingerprint,
+  loadCollapseState,
+  saveCollapseState,
+  loadScrollState,
+  saveScrollState,
 } from '@/lib/types';
 import '@/assets/main.css';
 
@@ -27,15 +33,41 @@ export default function FloatingApp({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [collapsedSet, setCollapsedSet] = useState<Set<number>>(new Set());
   const treeRef = useRef<OutlineTreeRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
-  const initialSmartCollapseDone = useRef(false);
+  const headingsFpRef = useRef('');
+  // Whether the NEXT headings effect should restore saved state.
+  // Only true when panel is reopened with UNCHANGED headings (silent+same fp).
+  // False for page refresh / mutation-triggered updates → always reset.
+  const shouldRestoreRef = useRef(false);
+  // Tracks visible without being stale in command-handler closures
+  const visibleRef = useRef(false);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const [pendingScrollTop, setPendingScrollTop] = useState<number | null>(null);
+  // True while waiting for scroll restore — keeps the panel opacity:0 to avoid flicker
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  // Keep visibleRef in sync
+  visibleRef.current = visible;
 
   // Load persisted settings on mount
   useEffect(() => {
     loadSettings().then(setSettings);
+  }, []);
+
+  // Sync settings changes from other panels
+  useEffect(() => {
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'sync' && changes[SETTINGS_KEY]) {
+        const newValue = changes[SETTINGS_KEY].newValue;
+        if (newValue) setSettings({ ...DEFAULT_SETTINGS, ...newValue });
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
 
   // Position state
@@ -76,7 +108,16 @@ export default function FloatingApp({
         height: state.height || '500px',
       };
       setPosition(newPos);
+      // Save isVisible=true using the loaded state object directly.
+      // Do NOT call savePanelState() here — its position closure is stale
+      // (React hasn't committed setPosition yet), which would overwrite the
+      // correct saved position with the default values.
+      chrome.runtime.sendMessage({
+        action: 'SAVE_FLOATING_STATE',
+        state: { ...state, isVisible: true },
+      });
     }
+    setIsInitializing(true);
     setVisible(true);
   }, []);
 
@@ -89,34 +130,32 @@ export default function FloatingApp({
   useEffect(() => {
     registerCommand((cmd) => {
       if (cmd === 'show') {
-        showPanel().then(() => savePanelState(true));
+        showPanel();
       } else if (cmd === 'hide') {
         hidePanel();
       } else if (cmd === 'toggle') {
-        setVisible((prev) => {
-          const next = !prev;
-          if (next) {
-            showPanel().then(() => savePanelState(true));
-          } else {
-            savePanelState(false);
-          }
-          return next;
-        });
+        // Use visibleRef to avoid stale closure AND avoid calling async showPanel()
+        // inside a setState callback (which would let setVisible(true) commit before
+        // setIsInitializing(true), causing a one-frame flicker with opacity:1).
+        if (visibleRef.current) {
+          hidePanel();
+        } else {
+          showPanel();
+        }
       }
     });
-  }, [registerCommand, showPanel, hidePanel, savePanelState]);
+  }, [registerCommand, showPanel, hidePanel]);
 
   // Process initial command
   useEffect(() => {
     if (initialCommand === 'show' || initialCommand === 'toggle') {
-      showPanel().then(() => savePanelState(true));
+      showPanel();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refresh TOC
-  const refreshTOC = useCallback(() => {
-    setIsRefreshing(true);
+  const refreshTOC = useCallback((opts: { silent?: boolean } = {}) => {
     const tags = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
     const raw = Array.from(tags)
       .map((t) => ({
@@ -126,22 +165,107 @@ export default function FloatingApp({
       }))
       .filter((h) => h.text.length > 0);
     const normalized = normalizeHeadings(raw);
+    const fp = headingsFingerprint(normalized);
+    // Skip spinner if called silently and headings haven't changed
+    const unchanged = opts.silent && headingsFpRef.current === fp && headingsFpRef.current !== '';
+    // Mark that the next headings effect should RESTORE saved state (panel reopen,
+    // same headings). For refresh / mutation updates this stays false → reset.
+    shouldRestoreRef.current = unchanged;
+    if (!unchanged) {
+      setIsRefreshing(true);
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
     setHeadings(normalized);
-    initialSmartCollapseDone.current = false;
-    setTimeout(() => setIsRefreshing(false), 500);
   }, []);
 
-  // Smart collapse after headings change
+  // Smart collapse / restore after headings change
   useEffect(() => {
-    if (headings.length > 0 && !initialSmartCollapseDone.current && treeRef.current) {
-      treeRef.current.smartCollapse(50);
-      initialSmartCollapseDone.current = true;
+    if (headings.length === 0) {
+      setCollapsedSet(new Set());
+      setPendingScrollTop(null);
+      setIsInitializing(false);
+      return;
     }
+    const fp = headingsFingerprint(headings);
+    headingsFpRef.current = fp;
+
+    const shouldRestore = shouldRestoreRef.current;
+    shouldRestoreRef.current = false;
+
+    if (shouldRestore) {
+      // Panel reopened with unchanged headings → restore saved collapse + scroll
+      Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
+        if (collapse?.fingerprint === fp) {
+          setCollapsedSet(new Set(collapse.collapsed));
+          if (scroll?.fingerprint === fp) {
+            // isInitializing stays true until scroll is applied in the rAF below
+            setPendingScrollTop(scroll.scrollTop);
+          } else {
+            setIsInitializing(false);
+          }
+        } else {
+          if (treeRef.current) treeRef.current.smartCollapse(50);
+          setIsInitializing(false);
+        }
+      }).catch(() => setIsInitializing(false));
+    } else {
+      // Page refreshed or headings mutated → reset to default state, no restore
+      setPendingScrollTop(null);
+      const vp = scrollViewportRef.current;
+      if (vp) vp.scrollTop = 0;
+      if (treeRef.current) {
+        treeRef.current.smartCollapse(50);
+      } else {
+        setCollapsedSet(new Set());
+      }
+      setIsInitializing(false);
+    }
+  }, [headings]);
+
+  // Persist collapse state on every change
+  useEffect(() => {
+    const fp = headingsFpRef.current;
+    if (!fp) return;
+    saveCollapseState({ fingerprint: fp, collapsed: Array.from(collapsedSet) });
+  }, [collapsedSet]);
+
+  // Apply pending scroll restore via rAF so the DOM is fully laid out.
+  // Always call setIsInitializing(false) even if the viewport ref isn't ready,
+  // so the panel never gets stuck at opacity:0.
+  useEffect(() => {
+    if (pendingScrollTop === null) return;
+    const vp = scrollViewportRef.current;
+    const raf = requestAnimationFrame(() => {
+      if (vp) vp.scrollTop = pendingScrollTop;
+      setPendingScrollTop(null);
+      setIsInitializing(false);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingScrollTop]);
+
+  // Persist scroll position (debounced)
+  useEffect(() => {
+    const vp = scrollViewportRef.current;
+    if (!vp) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      const fp = headingsFpRef.current;
+      const scrollTop = vp.scrollTop;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (fp) saveScrollState({ fingerprint: fp, scrollTop });
+      }, 300);
+    };
+    vp.addEventListener('scroll', handler, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      vp.removeEventListener('scroll', handler);
+    };
   }, [headings]);
 
   // Refresh on show
   useEffect(() => {
-    if (visible) refreshTOC();
+    if (visible) refreshTOC({ silent: true });
   }, [visible, refreshTOC]);
 
   // Content observer
@@ -230,6 +354,14 @@ export default function FloatingApp({
       const next = { ...prev, autoHighlightActive: !prev.autoHighlightActive };
       saveSettings(next);
       if (!next.autoHighlightActive) setActiveIndex(-1);
+      return next;
+    });
+  }, []);
+
+  const changeHighlightOpacity = useCallback((v: number) => {
+    setSettings((prev) => {
+      const next = { ...prev, highlightOpacity: v as Settings['highlightOpacity'] };
+      saveSettings(next);
       return next;
     });
   }, []);
@@ -395,6 +527,7 @@ export default function FloatingApp({
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         fontSize: '16px',
+        opacity: isInitializing ? 0 : 1,
       }}
     >
       <div
@@ -408,6 +541,7 @@ export default function FloatingApp({
             headings={headings}
             isRefreshing={isRefreshing}
             autoHighlightActive={settings.autoHighlightActive}
+            highlightOpacity={settings.highlightOpacity}
             portalContainer={portalContainer}
             onRefresh={refreshTOC}
             onCollapseAll={() => treeRef.current?.collapseAll()}
@@ -418,15 +552,19 @@ export default function FloatingApp({
             }
             onSwitchMode={switchToSidebar}
             onToggleAutoHighlight={toggleAutoHighlight}
+            onChangeHighlightOpacity={changeHighlightOpacity}
             onClose={hidePanel}
           />
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
           <OutlineTree
             ref={treeRef}
             headings={headings}
+            collapsedSet={collapsedSet}
+            onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
+            highlightOpacity={settings.highlightOpacity}
             onJump={jumpTo}
             onHighlight={selectRange}
           />

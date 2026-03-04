@@ -25,6 +25,7 @@ interface OutlineHeaderProps {
   headings: HeadingItem[];
   isRefreshing: boolean;
   autoHighlightActive: boolean;
+  highlightOpacity: number;
   portalContainer?: HTMLElement | null;
   onRefresh: () => void;
   onCollapseAll: () => void;
@@ -33,6 +34,7 @@ interface OutlineHeaderProps {
   onSmartCollapse: (threshold: number) => void;
   onSwitchMode: () => void;
   onToggleAutoHighlight: () => void;
+  onChangeHighlightOpacity: (v: number) => void;
   onClose?: () => void;
 }
 
@@ -41,6 +43,7 @@ export default function OutlineHeader({
   headings,
   isRefreshing,
   autoHighlightActive,
+  highlightOpacity,
   portalContainer,
   onRefresh,
   onCollapseAll,
@@ -49,6 +52,7 @@ export default function OutlineHeader({
   onSmartCollapse,
   onSwitchMode,
   onToggleAutoHighlight,
+  onChangeHighlightOpacity,
   onClose,
 }: OutlineHeaderProps) {
   let maxLevel = 0;
@@ -140,6 +144,20 @@ export default function OutlineHeader({
             >
               高亮当前标题
             </DropdownMenuCheckboxItem>
+            {autoHighlightActive && (
+              <>
+                <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
+                {([10, 20, 30, 40, 50] as const).map((op) => (
+                  <DropdownMenuCheckboxItem
+                    key={op}
+                    checked={highlightOpacity === op}
+                    onCheckedChange={() => onChangeHighlightOpacity(op)}
+                  >
+                    {op}%
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Show Levels</DropdownMenuLabel>
             {Array.from({ length: Math.min(levelLimit, 6) }, (_, i) => i + 1).map(
