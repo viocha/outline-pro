@@ -2,13 +2,14 @@
   "name": "outline-pro",
   "description": "Smart outline generator with Sidebar and Floating modes for easy navigation.",
   "private": true,
-  "version": "2.3.1",
+  "version": "2.3.2",
   "type": "module",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
+    "icons:build": "node scripts/build-icons.mjs",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
@@ -31,6 +32,7 @@
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "wxt": "^0.20.14"
   }

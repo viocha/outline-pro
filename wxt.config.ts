@@ -8,10 +8,20 @@ export default defineConfig({
     name: 'Outline Pro',
     description:
       '智能大纲生成器，支持侧栏和悬浮两种模式，轻松导航页面内容。',
+    icons: {
+      16: 'icon/16.png',
+      32: 'icon/32.png',
+      48: 'icon/48.png',
+      128: 'icon/128.png',
+    },
     permissions: ['sidePanel', 'scripting', 'contextMenus', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*', 'file://*/*'],
     action: {
       default_title: 'Open Outline Pro',
+      default_icon: {
+        16: 'icon/16.png',
+        32: 'icon/32.png',
+      },
     },
     commands: {
       _execute_action: {
