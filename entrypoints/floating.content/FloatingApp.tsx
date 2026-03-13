@@ -24,6 +24,13 @@ interface FloatingAppProps {
   initialCommand: 'show' | 'hide' | 'toggle';
 }
 
+type ResizeDirection =
+  | 'left'
+  | 'right'
+  | 'bottom'
+  | 'bottom-left'
+  | 'bottom-right';
+
 export default function FloatingApp({
   registerCommand,
   initialCommand,
@@ -167,7 +174,8 @@ export default function FloatingApp({
     const normalized = normalizeHeadings(raw);
     const fp = headingsFingerprint(normalized);
     // Skip spinner if called silently and headings haven't changed
-    const unchanged = opts.silent && headingsFpRef.current === fp && headingsFpRef.current !== '';
+    const unchanged =
+      !!opts.silent && headingsFpRef.current === fp && headingsFpRef.current !== '';
     // Mark that the next headings effect should RESTORE saved state (panel reopen,
     // same headings). For refresh / mutation updates this stays false → reset.
     shouldRestoreRef.current = unchanged;
@@ -439,9 +447,8 @@ export default function FloatingApp({
     [position, savePanelState],
   );
 
-  // --- Resize BR logic ---
-  const handleResizeBR = useCallback(
-    (e: React.MouseEvent) => {
+  const startResize = useCallback(
+    (e: React.MouseEvent, direction: ResizeDirection) => {
       e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
@@ -452,14 +459,33 @@ export default function FloatingApp({
       const onMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
-        const newWidth = Math.max(200, initialWidth + dx);
-        const newHeight = Math.max(150, initialHeight + dy);
-        const widthChange = newWidth - initialWidth;
+
+        let nextWidth = initialWidth;
+        let nextHeight = initialHeight;
+        let nextRight = initialRight;
+
+        if (direction === 'right' || direction === 'bottom-right') {
+          nextWidth = Math.max(200, initialWidth + dx);
+          nextRight = initialRight - (nextWidth - initialWidth);
+        }
+
+        if (direction === 'left' || direction === 'bottom-left') {
+          nextWidth = Math.max(200, initialWidth - dx);
+        }
+
+        if (
+          direction === 'bottom' ||
+          direction === 'bottom-left' ||
+          direction === 'bottom-right'
+        ) {
+          nextHeight = Math.max(150, initialHeight + dy);
+        }
+
         setPosition((p) => ({
           ...p,
-          width: `${newWidth}px`,
-          height: `${newHeight}px`,
-          right: `${initialRight - widthChange}px`,
+          width: `${nextWidth}px`,
+          height: `${nextHeight}px`,
+          right: `${nextRight}px`,
         }));
       };
 
@@ -478,38 +504,29 @@ export default function FloatingApp({
     [position, savePanelState],
   );
 
-  // --- Resize BL logic ---
+  const handleResizeRight = useCallback(
+    (e: React.MouseEvent) => startResize(e, 'right'),
+    [startResize],
+  );
+
+  const handleResizeLeft = useCallback(
+    (e: React.MouseEvent) => startResize(e, 'left'),
+    [startResize],
+  );
+
+  const handleResizeBottom = useCallback(
+    (e: React.MouseEvent) => startResize(e, 'bottom'),
+    [startResize],
+  );
+
+  const handleResizeBR = useCallback(
+    (e: React.MouseEvent) => startResize(e, 'bottom-right'),
+    [startResize],
+  );
+
   const handleResizeBL = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const initialWidth = parseFloat(position.width);
-      const initialHeight = parseFloat(position.height);
-
-      const onMouseMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        setPosition((p) => ({
-          ...p,
-          width: `${Math.max(200, initialWidth - dx)}px`,
-          height: `${Math.max(150, initialHeight + dy)}px`,
-        }));
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        setPosition((p) => {
-          savePanelState(true, p);
-          return p;
-        });
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    },
-    [position, savePanelState],
+    (e: React.MouseEvent) => startResize(e, 'bottom-left'),
+    [startResize],
   );
 
   if (!visible) return null;
@@ -570,19 +587,33 @@ export default function FloatingApp({
           />
         </ScrollArea>
 
-        {/* Resize handles */}
-        <div
-          className="absolute bottom-0 right-0 size-6 cursor-se-resize z-20"
-          onMouseDown={handleResizeBR}
-        />
-        <div
-          className="absolute bottom-0 left-0 size-6 cursor-sw-resize z-20"
-          onMouseDown={handleResizeBL}
-        />
-
         {/* Portal container for dropdown menus - must stay inside Shadow DOM */}
         <div ref={setPortalContainer} className="absolute z-50" />
       </div>
+
+      {/* Resize handles stay on the outside edge so they don't steal inner clicks */}
+      <div
+        className="absolute top-3 bottom-3 -left-1 w-2 cursor-w-resize z-20"
+        onMouseDown={handleResizeLeft}
+      />
+      <div
+        className="absolute top-3 bottom-3 -right-1 w-2 cursor-e-resize z-20"
+        onMouseDown={handleResizeRight}
+      />
+      <div
+        className="absolute -bottom-1 left-3 right-3 h-2 cursor-s-resize z-20"
+        onMouseDown={handleResizeBottom}
+      />
+      <div
+        className="absolute -bottom-1 -right-1 z-30 cursor-se-resize"
+        onMouseDown={handleResizeBR}
+        style={{ width: '12px', height: '12px' }}
+      />
+      <div
+        className="absolute -bottom-1 -left-1 z-30 cursor-sw-resize"
+        onMouseDown={handleResizeBL}
+        style={{ width: '12px', height: '12px' }}
+      />
     </div>
   );
 }
