@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -55,6 +56,7 @@ export default function OutlineHeader({
   onChangeHighlightOpacity,
   onClose,
 }: OutlineHeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   let maxLevel = 0;
   headings.forEach((h) => {
     if (h.level > maxLevel) maxLevel = h.level;
@@ -80,7 +82,7 @@ export default function OutlineHeader({
   return (
     <header
       className={cn(
-        'flex items-center justify-between px-3 border-b border-border bg-white shrink-0 h-9 box-border',
+        'flex items-center justify-between px-3 border-b border-border bg-white shrink-0 h-9 box-border select-none',
         mode === 'floating' && 'cursor-move select-none pr-2',
       )}
     >
@@ -131,7 +133,30 @@ export default function OutlineHeader({
         </Button>
 
         {/* Level menu */}
-        <DropdownMenu modal={mode !== 'floating'}>
+        {menuOpen && (
+          <div
+            className="fixed inset-0 z-40"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen(false);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen(false);
+            }}
+          />
+        )}
+        <DropdownMenu
+          modal={mode !== 'floating'}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+        >
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" title="选择展开层级">
               <Ellipsis className="size-4" />

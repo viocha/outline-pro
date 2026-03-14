@@ -2,7 +2,7 @@
   "name": "outline-pro",
   "description": "Smart outline generator with Sidebar and Floating modes for easy navigation.",
   "private": true,
-  "version": "2.3.3",
+  "version": "2.4.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

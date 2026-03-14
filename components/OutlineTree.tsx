@@ -1,4 +1,13 @@
-import { useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
+import {
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TreeNode, HeadingItem } from '@/lib/types';
@@ -40,9 +49,16 @@ interface OutlineTreeProps {
   onHighlight: (index: number) => void;
 }
 
+interface ContextMenuState {
+  index: number;
+  x: number;
+  y: number;
+}
+
 const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
   ({ headings, collapsedSet, onCollapsedSetChange, activeIndex, highlightOpacity = 30, onJump, onHighlight }, ref) => {
     const tree = useMemo(() => buildTree(headings), [headings]);
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
     // Stable refs so the activeIndex effect never captures stale values
     const collapsedSetRef = useRef(collapsedSet);
@@ -101,6 +117,76 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
       }
       onCollapsedSetChange(next);
     }, [collapsedSet, onCollapsedSetChange]);
+
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
+    const getSubtreeParentIndices = useCallback((targetIndex: number) => {
+      let result: number[] = [];
+
+      const walk = (nodes: TreeNode[]): boolean => {
+        for (const node of nodes) {
+          if (node.index === targetIndex) {
+            const indices: number[] = [];
+            const collect = (current: TreeNode) => {
+              if (current.children.length > 0) {
+                indices.push(current.index);
+                current.children.forEach(collect);
+              }
+            };
+            collect(node);
+            result = indices;
+            return true;
+          }
+          if (walk(node.children)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      walk(tree);
+      return result;
+    }, [tree]);
+
+    const collapseSubtree = useCallback((targetIndex: number) => {
+      const indices = getSubtreeParentIndices(targetIndex);
+      if (indices.length === 0) return;
+      const next = new Set(collapsedSetRef.current);
+      indices.forEach((index) => next.add(index));
+      onCollapsedSetChangeRef.current(next);
+    }, [getSubtreeParentIndices]);
+
+    const expandSubtree = useCallback((targetIndex: number) => {
+      const indices = getSubtreeParentIndices(targetIndex);
+      if (indices.length === 0) return;
+      const next = new Set(collapsedSetRef.current);
+      indices.forEach((index) => next.delete(index));
+      onCollapsedSetChangeRef.current(next);
+    }, [getSubtreeParentIndices]);
+
+    useEffect(() => {
+      if (!contextMenu) return;
+
+      const handleScroll = () => {
+        setContextMenu(null);
+      };
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setContextMenu(null);
+        }
+      };
+
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', handleScroll);
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener('resize', handleScroll);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [contextMenu]);
 
     // Get all parent (non-leaf) node indices
     const getParentIndices = useCallback(
@@ -205,8 +291,48 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
             onToggle={toggleCollapse}
             onJump={onJump}
             onHighlight={onHighlight}
+            contextMenuIndex={contextMenu?.index}
+            onOpenContextMenu={(index, x, y) => setContextMenu({ index, x, y })}
           />
         ))}
+        {contextMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-[99]"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeContextMenu();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeContextMenu();
+              }}
+            />
+            <TreeNodeContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              hasChildren={getSubtreeParentIndices(contextMenu.index).length > 0}
+              onJump={() => {
+                onJump(contextMenu.index);
+                closeContextMenu();
+              }}
+              onCollapseRecursive={() => {
+                collapseSubtree(contextMenu.index);
+                closeContextMenu();
+              }}
+              onExpandRecursive={() => {
+                expandSubtree(contextMenu.index);
+                closeContextMenu();
+              }}
+            />
+          </>
+        )}
       </div>
     );
   },
@@ -221,6 +347,8 @@ interface TreeNodeItemProps {
   onToggle: (index: number) => void;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
+  contextMenuIndex?: number;
+  onOpenContextMenu: (index: number, x: number, y: number) => void;
 }
 
 function TreeNodeItem({
@@ -231,10 +359,13 @@ function TreeNodeItem({
   onToggle,
   onJump,
   onHighlight,
+  contextMenuIndex,
+  onOpenContextMenu,
 }: TreeNodeItemProps) {
   const isLeaf = node.children.length === 0;
   const isCollapsed = collapsedSet.has(node.index);
   const isActive = activeIndex === node.index;
+  const isContextMenuOpen = contextMenuIndex === node.index;
   const level = node.heading.level;
 
   const fontSizeClass =
@@ -269,6 +400,12 @@ function TreeNodeItem({
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenContextMenu(node.index, e.clientX, e.clientY);
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header row */}
@@ -278,13 +415,17 @@ function TreeNodeItem({
           'group flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
           'min-w-full w-fit box-border',
           'hover:bg-bg-hover',
+          isContextMenuOpen && 'bg-bg-hover',
         )}
         style={{
           paddingLeft: 0,
-          ...(isActive ? { backgroundColor: `rgb(209 250 229 / ${highlightOpacity}%)` } : {}),
+          ...(isActive && !isContextMenuOpen
+            ? { backgroundColor: `rgb(209 250 229 / ${highlightOpacity}%)` }
+            : {}),
         }}
         onClick={handleHeaderClick}
         onDoubleClick={handleHeaderDblClick}
+        onContextMenu={handleContextMenu}
       >
         {/* Toggle icon */}
         <div
@@ -306,6 +447,7 @@ function TreeNodeItem({
           className={cn(
             'whitespace-nowrap transition-colors duration-100 leading-[1.4] text-[#444]',
             isLeaf ? 'group-hover:text-primary' : 'hover:text-primary',
+            isContextMenuOpen && 'text-primary',
             fontSizeClass,
           )}
           title={node.heading.text}
@@ -328,12 +470,82 @@ function TreeNodeItem({
               collapsedSet={collapsedSet}
               activeIndex={activeIndex}
               highlightOpacity={highlightOpacity}
-              onToggle={onToggle}
-              onJump={onJump}
-              onHighlight={onHighlight}
-            />
-          ))}
-        </div>
+            onToggle={onToggle}
+            onJump={onJump}
+            onHighlight={onHighlight}
+            contextMenuIndex={contextMenuIndex}
+            onOpenContextMenu={onOpenContextMenu}
+          />
+        ))}
+      </div>
+    )}
+  </div>
+);
+}
+
+interface TreeNodeContextMenuProps {
+  x: number;
+  y: number;
+  hasChildren: boolean;
+  onJump: () => void;
+  onCollapseRecursive: () => void;
+  onExpandRecursive: () => void;
+}
+
+function TreeNodeContextMenu({
+  x,
+  y,
+  hasChildren,
+  onJump,
+  onCollapseRecursive,
+  onExpandRecursive,
+}: TreeNodeContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: x, top: y });
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    const { innerWidth, innerHeight } = window;
+    const rect = menu.getBoundingClientRect();
+    const nextLeft = Math.max(8, Math.min(x, innerWidth - rect.width - 8));
+    const nextTop = Math.max(8, Math.min(y, innerHeight - rect.height - 8));
+    setPosition({ left: nextLeft, top: nextTop });
+  }, [x, y]);
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-[100] w-max min-w-[112px] rounded-md border border-border bg-white p-1 shadow-lg"
+      style={{ left: position.left, top: position.top }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+        onClick={onJump}
+      >
+        跳转到标题
+      </button>
+      {hasChildren && (
+        <>
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+            onClick={onCollapseRecursive}
+          >
+            递归折叠
+          </button>
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+            onClick={onExpandRecursive}
+          >
+            递归展开
+          </button>
+        </>
       )}
     </div>
   );
