@@ -286,6 +286,7 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
           <TreeNodeItem
             key={node.index}
             node={node}
+            depth={0}
             collapsedSet={collapsedSet}
             activeIndex={activeIndex}
             highlightOpacity={highlightOpacity}
@@ -344,6 +345,7 @@ OutlineTree.displayName = 'OutlineTree';
 
 interface TreeNodeItemProps {
   node: TreeNode;
+  depth: number;
   collapsedSet: Set<number>;
   activeIndex?: number;
   highlightOpacity?: number;
@@ -362,6 +364,7 @@ interface TreeNodeItemProps {
 
 function TreeNodeItem({
   node,
+  depth,
   collapsedSet,
   activeIndex,
   highlightOpacity = 30,
@@ -435,7 +438,7 @@ function TreeNodeItem({
           isContextMenuOpen && 'bg-bg-hover',
         )}
         style={{
-          paddingLeft: 0,
+          paddingLeft: depth * 18,
           ...(isActive && !isContextMenuOpen
             ? { backgroundColor: `rgb(209 250 229 / ${highlightOpacity}%)` }
             : {}),
@@ -477,27 +480,26 @@ function TreeNodeItem({
       </div>
 
       {/* Children */}
-      {!isLeaf && (
-        <div
-          className={cn('pl-[18px]', isCollapsed && 'hidden')}
-        >
+      {!isLeaf && !isCollapsed && (
+        <>
           {node.children.map((child) => (
             <TreeNodeItem
               key={child.index}
               node={child}
+              depth={depth + 1}
               collapsedSet={collapsedSet}
               activeIndex={activeIndex}
               highlightOpacity={highlightOpacity}
-            onToggle={onToggle}
-            onJump={onJump}
-            onHighlight={onHighlight}
-            contextMenuIndex={contextMenuIndex}
-            contextMenuHighlightText={contextMenuHighlightText}
-            onOpenContextMenu={onOpenContextMenu}
-          />
-        ))}
-      </div>
-    )}
+              onToggle={onToggle}
+              onJump={onJump}
+              onHighlight={onHighlight}
+              contextMenuIndex={contextMenuIndex}
+              contextMenuHighlightText={contextMenuHighlightText}
+              onOpenContextMenu={onOpenContextMenu}
+            />
+          ))}
+        </>
+      )}
   </div>
 );
 }
