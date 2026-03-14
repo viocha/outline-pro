@@ -549,30 +549,28 @@ export default function FloatingApp({
     >
       <div
         ref={panelRef}
-        className="relative flex flex-col h-full bg-white shadow-lg border border-gray-300 rounded-lg overflow-hidden"
+        className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl shadow-black/10 animate-in fade-in-0 zoom-in-95 duration-150"
       >
-        {/* Header with drag handle */}
-        <div onMouseDown={handleDragStart}>
-          <OutlineHeader
-            mode="floating"
-            headings={headings}
-            isRefreshing={isRefreshing}
-            autoHighlightActive={settings.autoHighlightActive}
-            highlightOpacity={settings.highlightOpacity}
-            portalContainer={portalContainer}
-            onRefresh={refreshTOC}
-            onCollapseAll={() => treeRef.current?.collapseAll()}
-            onExpandAll={() => treeRef.current?.expandAll()}
-            onExpandToLevel={(level) => treeRef.current?.expandToLevel(level)}
-            onSmartCollapse={(threshold) =>
-              treeRef.current?.smartCollapse(threshold)
-            }
-            onSwitchMode={switchToSidebar}
-            onToggleAutoHighlight={toggleAutoHighlight}
-            onChangeHighlightOpacity={changeHighlightOpacity}
-            onClose={hidePanel}
-          />
-        </div>
+        <OutlineHeader
+          mode="floating"
+          headings={headings}
+          isRefreshing={isRefreshing}
+          autoHighlightActive={settings.autoHighlightActive}
+          highlightOpacity={settings.highlightOpacity}
+          portalContainer={portalContainer}
+          onDragHandleMouseDown={handleDragStart}
+          onRefresh={refreshTOC}
+          onCollapseAll={() => treeRef.current?.collapseAll()}
+          onExpandAll={() => treeRef.current?.expandAll()}
+          onExpandToLevel={(level) => treeRef.current?.expandToLevel(level)}
+          onSmartCollapse={(threshold) =>
+            treeRef.current?.smartCollapse(threshold)
+          }
+          onSwitchMode={switchToSidebar}
+          onToggleAutoHighlight={toggleAutoHighlight}
+          onChangeHighlightOpacity={changeHighlightOpacity}
+          onClose={hidePanel}
+        />
 
         <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
           <OutlineTree

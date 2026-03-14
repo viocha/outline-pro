@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /*
  * Shadow DOM host reset
@@ -11,26 +12,64 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
-  color: #333;
+  color: var(--foreground);
+  background-color: var(--background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-@theme {
-  /*
-   * Use px instead of rem for all base units.
-   * This isolates the UI from the external page's root font-size,
-   * since CSS rem always references <html> even inside Shadow DOM.
-   * Values are the px equivalents assuming the default 1rem = 16px.
-   */
+:root {
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #2563eb;
+  --primary-foreground: #f8fafc;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #6b7280;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --destructive-foreground: #fef2f2;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #93c5fd;
+  --text-dim: #9ca3af;
+}
+
+:host {
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #2563eb;
+  --primary-foreground: #f8fafc;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #6b7280;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --destructive-foreground: #fef2f2;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #93c5fd;
+  --text-dim: #9ca3af;
+}
+
+@theme inline {
   --spacing: 4px;
 
-  /* Border radius (default rem -> px) */
-  /* --radius is the bare "rounded" class (Tailwind default: 0.25rem) */
   --radius-xs: 2px;
   --radius-sm: 2px;
   --radius: 4px;
-  --radius-md: 6px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
@@ -38,7 +77,6 @@
   --radius-3xl: 24px;
   --radius-4xl: 32px;
 
-  /* Font sizes (default rem -> px) */
   --text-xs: 12px;
   --text-xs--line-height: 16px;
   --text-sm: 14px;
@@ -50,11 +88,34 @@
   --text-xl: 20px;
   --text-xl--line-height: 28px;
 
-  /* Custom semantic colors */
-  --color-primary: #007bff;
-  --color-bg-hover: #f0f7ff;
-  --color-border: #eee;
-  --color-text: #333;
-  --color-text-muted: #666;
-  --color-text-dim: #999;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Backwards-compatible aliases for the existing app code */
+  --color-bg-hover: var(--accent);
+  --color-text: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-text-dim: var(--text-dim);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
 }

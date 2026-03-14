@@ -4,17 +4,19 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded transition-colors cursor-pointer disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-[color,background-color,box-shadow] duration-150 cursor-pointer outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-white hover:bg-primary/90',
-        ghost: 'bg-transparent text-text-muted hover:bg-bg-hover hover:text-primary data-[state=open]:bg-bg-hover data-[state=open]:text-primary',
+        default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+        secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+        outline: 'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
+        ghost: 'bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground',
       },
       size: {
-        default: 'h-8 px-3 text-sm',
-        sm: 'h-7 px-2 text-xs',
-        icon: 'size-6 p-0',
+        default: 'h-8 px-3',
+        sm: 'h-7 rounded-md px-2.5 text-[12px]',
+        icon: 'size-7 p-0',
       },
     },
     defaultVariants: {

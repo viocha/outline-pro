@@ -53,6 +53,7 @@ interface ContextMenuState {
   index: number;
   x: number;
   y: number;
+  highlightText: boolean;
 }
 
 const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
@@ -292,7 +293,9 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
             onJump={onJump}
             onHighlight={onHighlight}
             contextMenuIndex={contextMenu?.index}
-            onOpenContextMenu={(index, x, y) => setContextMenu({ index, x, y })}
+            contextMenuHighlightText={contextMenu?.highlightText}
+            onOpenContextMenu={(index, x, y, highlightText) =>
+              setContextMenu({ index, x, y, highlightText })}
           />
         ))}
         {contextMenu && (
@@ -348,7 +351,13 @@ interface TreeNodeItemProps {
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
   contextMenuIndex?: number;
-  onOpenContextMenu: (index: number, x: number, y: number) => void;
+  contextMenuHighlightText?: boolean;
+  onOpenContextMenu: (
+    index: number,
+    x: number,
+    y: number,
+    highlightText: boolean,
+  ) => void;
 }
 
 function TreeNodeItem({
@@ -360,13 +369,16 @@ function TreeNodeItem({
   onJump,
   onHighlight,
   contextMenuIndex,
+  contextMenuHighlightText,
   onOpenContextMenu,
 }: TreeNodeItemProps) {
   const isLeaf = node.children.length === 0;
   const isCollapsed = collapsedSet.has(node.index);
   const isActive = activeIndex === node.index;
   const isContextMenuOpen = contextMenuIndex === node.index;
+  const shouldKeepTextHighlight = isContextMenuOpen && contextMenuHighlightText;
   const level = node.heading.level;
+  const textRef = useRef<HTMLDivElement>(null);
 
   const fontSizeClass =
     level <= 2
@@ -403,7 +415,12 @@ function TreeNodeItem({
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    onOpenContextMenu(node.index, e.clientX, e.clientY);
+    const highlightText =
+      isLeaf ||
+      (!!textRef.current &&
+        e.target instanceof Node &&
+        textRef.current.contains(e.target));
+    onOpenContextMenu(node.index, e.clientX, e.clientY, highlightText);
   };
 
   return (
@@ -430,8 +447,8 @@ function TreeNodeItem({
         {/* Toggle icon */}
         <div
           className={cn(
-            'size-[1.2em] shrink-0 flex items-center justify-center text-text-dim rounded mr-0.5',
-            'hover:bg-black/5 hover:text-text-muted',
+            'mr-0.5 flex size-[1.2em] shrink-0 items-center justify-center rounded text-text-dim',
+            'hover:bg-accent hover:text-muted-foreground',
             isLeaf && 'invisible pointer-events-none',
           )}
         >
@@ -445,11 +462,12 @@ function TreeNodeItem({
         {/* Text */}
         <div
           className={cn(
-            'whitespace-nowrap transition-colors duration-100 leading-[1.4] text-[#444]',
+            'whitespace-nowrap leading-[1.4] text-foreground/90 transition-colors duration-100',
             isLeaf ? 'group-hover:text-primary' : 'hover:text-primary',
-            isContextMenuOpen && 'text-primary',
+            shouldKeepTextHighlight && 'text-primary',
             fontSizeClass,
           )}
+          ref={textRef}
           title={node.heading.text}
           onClick={handleTextClick}
           onDoubleClick={handleTextDblClick}
@@ -474,6 +492,7 @@ function TreeNodeItem({
             onJump={onJump}
             onHighlight={onHighlight}
             contextMenuIndex={contextMenuIndex}
+            contextMenuHighlightText={contextMenuHighlightText}
             onOpenContextMenu={onOpenContextMenu}
           />
         ))}
@@ -517,14 +536,14 @@ function TreeNodeContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] w-max min-w-[112px] rounded-md border border-border bg-white p-1 shadow-lg"
+      className="fixed z-[100] w-max min-w-[112px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 duration-100"
       style={{ left: position.left, top: position.top }}
       onPointerDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+        className="flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-[13px] outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
         onClick={onJump}
       >
         跳转到标题
@@ -533,14 +552,14 @@ function TreeNodeContextMenu({
         <>
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+            className="flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-[13px] outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
             onClick={onCollapseRecursive}
           >
             递归折叠
           </button>
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center rounded px-3 py-1 text-left text-[13px] text-text outline-none transition-colors hover:bg-bg-hover hover:text-primary"
+            className="flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-[13px] outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
             onClick={onExpandRecursive}
           >
             递归展开

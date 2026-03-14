@@ -357,7 +357,7 @@ export default function SidePanel() {
   }, [refreshTOC]);
 
   return (
-    <div className="flex flex-col h-screen bg-white font-sans m-0 overscroll-none">
+    <div className="m-0 flex h-screen flex-col overscroll-none bg-background font-sans text-foreground">
       <OutlineHeader
         mode="sidepanel"
         headings={headings}

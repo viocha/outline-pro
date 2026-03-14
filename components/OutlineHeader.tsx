@@ -28,6 +28,7 @@ interface OutlineHeaderProps {
   autoHighlightActive: boolean;
   highlightOpacity: number;
   portalContainer?: HTMLElement | null;
+  onDragHandleMouseDown?: (e: React.MouseEvent) => void;
   onRefresh: () => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
@@ -46,6 +47,7 @@ export default function OutlineHeader({
   autoHighlightActive,
   highlightOpacity,
   portalContainer,
+  onDragHandleMouseDown,
   onRefresh,
   onCollapseAll,
   onExpandAll,
@@ -82,20 +84,21 @@ export default function OutlineHeader({
   return (
     <header
       className={cn(
-        'flex items-center justify-between px-3 border-b border-border bg-white shrink-0 h-9 box-border select-none',
+        'flex h-9 shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 box-border select-none backdrop-blur supports-[backdrop-filter]:bg-background/85',
         mode === 'floating' && 'cursor-move select-none pr-2',
       )}
     >
       <div
         className={cn(
-          'font-semibold text-sm text-text',
+          'text-sm font-semibold tracking-tight text-foreground',
           mode === 'floating' && 'cursor-move flex-1',
         )}
+        onMouseDown={mode === 'floating' ? onDragHandleMouseDown : undefined}
       >
         Outline
       </div>
 
-      <div className="flex gap-0.5 items-center cursor-default">
+      <div className="flex items-center gap-0.5 cursor-default">
         {/* Switch mode button */}
         <Button
           variant="ghost"
@@ -139,11 +142,15 @@ export default function OutlineHeader({
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              setMenuOpen(false);
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
             }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              setMenuOpen(false);
             }}
             onContextMenu={(e) => {
               e.preventDefault();
