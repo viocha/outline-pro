@@ -14,11 +14,11 @@ import type { TreeNode, HeadingItem } from '@/lib/types';
 import { buildTree } from '@/lib/types';
 
 const ACTIVE_ROW_HIGHLIGHT_CLASS_MAP = {
-  10: 'bg-violet-100/10',
-  20: 'bg-violet-100/20',
-  30: 'bg-violet-100/30',
-  40: 'bg-violet-100/40',
-  50: 'bg-violet-100/50',
+  10: 'bg-blue-100/10',
+  20: 'bg-blue-100/20',
+  30: 'bg-blue-100/30',
+  40: 'bg-blue-100/40',
+  50: 'bg-blue-100/50',
 } as const;
 
 function getActiveRowHighlightClass(opacity: number) {
@@ -506,8 +506,8 @@ function TreeNodeItem({
           className={cn(
             'whitespace-nowrap leading-[1.4] text-foreground/90 transition-colors duration-100',
             isLeaf || nonLeafBlankAreaJump
-              ? 'group-hover:text-primary'
-              : 'hover:text-primary',
+              ? 'group-hover:text-primary-strong'
+              : 'hover:text-primary-strong',
             shouldKeepTextHighlight && 'text-primary',
             fontSizeClass,
           )}

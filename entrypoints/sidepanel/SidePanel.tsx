@@ -20,9 +20,12 @@ import {
 const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
 const ACTIVE_HEADING_TOLERANCE_PX = 12;
 
-function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
+function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void | Promise<void>,
+  ms: number,
+) {
   let timer: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
+  return (...args: Args) => {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
@@ -329,7 +332,7 @@ export default function SidePanel() {
             return active;
           },
         })
-        .then((results: { result: unknown }[]) => {
+        .then((results: chrome.scripting.InjectionResult<number>[]) => {
           const idx = results?.[0]?.result;
           if (typeof idx === 'number' && idx >= 0) {
             setActiveIndex(idx);
@@ -356,7 +359,7 @@ export default function SidePanel() {
 
     const tabUpdatedListener = (
       tabId: number,
-      info: chrome.tabs.TabChangeInfo,
+      info: chrome.tabs.OnUpdatedInfo,
       tab: chrome.tabs.Tab,
     ) => {
       if (!tab.active) return;

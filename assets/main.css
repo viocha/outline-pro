@@ -18,7 +18,8 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-:root {
+:root,
+:host  {
   --background: #ffffff;
   --foreground: #111827;
   --card: #ffffff;
@@ -26,6 +27,7 @@
   --popover: #ffffff;
   --popover-foreground: #111827;
   --primary: #2563eb;
+  --primary-strong: #2048b9;
   --primary-foreground: #f8fafc;
   --secondary: #f4f4f5;
   --secondary-foreground: #18181b;
@@ -41,30 +43,7 @@
   --text-dim: #9ca3af;
 }
 
-:host {
-  --background: #ffffff;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #2563eb;
-  --primary-foreground: #f8fafc;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #6b7280;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
-  --destructive: #dc2626;
-  --destructive-foreground: #fef2f2;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #93c5fd;
-  --text-dim: #9ca3af;
-}
-
-@theme inline {
+@theme {
   --spacing: 4px;
 
   --radius-xs: 2px;
@@ -95,6 +74,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);

@@ -1,3 +1,5 @@
+import type { FloatingState } from '@/lib/types';
+
 /**
  * Background Service Worker
  */
@@ -109,7 +111,10 @@ export default defineBackground(() => {
       const newTabHost = getHost(newTabUrl);
       if (openerHost && newTabHost && openerHost === newTabHost) {
         const openerKey = `floating_state_${openerTabId}`;
-        const data = await chrome.storage.local.get(openerKey);
+        const data = await chrome.storage.local.get(openerKey) as Record<
+          string,
+          FloatingState | undefined
+        >;
         const openerState = data[openerKey];
         if (openerState?.isVisible) {
           const newKey = `floating_state_${tabId}`;

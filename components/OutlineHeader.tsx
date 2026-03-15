@@ -68,6 +68,7 @@ export default function OutlineHeader({
   const [menuOpen, setMenuOpen] = useState(false);
   const [highlightSubmenuOpen, setHighlightSubmenuOpen] = useState(false);
   const closeHighlightSubmenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   let maxLevel = 0;
   headings.forEach((h) => {
     if (h.level > maxLevel) maxLevel = h.level;
@@ -114,6 +115,9 @@ export default function OutlineHeader({
     if (!menuOpen) {
       clearHighlightSubmenuCloseTimer();
       setHighlightSubmenuOpen(false);
+      requestAnimationFrame(() => {
+        menuTriggerRef.current?.blur();
+      });
     }
     return () => {
       clearHighlightSubmenuCloseTimer();
@@ -204,11 +208,20 @@ export default function OutlineHeader({
           onOpenChange={setMenuOpen}
         >
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" title="选择展开层级">
+            <Button
+              ref={menuTriggerRef}
+              variant="ghost"
+              size="icon"
+              title="选择展开层级"
+            >
               <Ellipsis className="size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" container={portalContainer}>
+          <DropdownMenuContent
+            align="end"
+            container={portalContainer}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
 						<DropdownMenuCheckboxItem
               checked={nonLeafBlankAreaJump}
               onCheckedChange={onToggleNonLeafBlankAreaJump}
