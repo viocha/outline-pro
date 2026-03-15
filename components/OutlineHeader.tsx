@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,6 +8,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   Minus,
@@ -27,6 +30,7 @@ interface OutlineHeaderProps {
   isRefreshing: boolean;
   autoHighlightActive: boolean;
   highlightOpacity: number;
+  nonLeafBlankAreaJump: boolean;
   portalContainer?: HTMLElement | null;
   onDragHandleMouseDown?: (e: React.MouseEvent) => void;
   onRefresh: () => void;
@@ -37,6 +41,7 @@ interface OutlineHeaderProps {
   onSwitchMode: () => void;
   onToggleAutoHighlight: () => void;
   onChangeHighlightOpacity: (v: number) => void;
+  onToggleNonLeafBlankAreaJump: () => void;
   onClose?: () => void;
 }
 
@@ -46,6 +51,7 @@ export default function OutlineHeader({
   isRefreshing,
   autoHighlightActive,
   highlightOpacity,
+  nonLeafBlankAreaJump,
   portalContainer,
   onDragHandleMouseDown,
   onRefresh,
@@ -56,9 +62,12 @@ export default function OutlineHeader({
   onSwitchMode,
   onToggleAutoHighlight,
   onChangeHighlightOpacity,
+  onToggleNonLeafBlankAreaJump,
   onClose,
 }: OutlineHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [highlightSubmenuOpen, setHighlightSubmenuOpen] = useState(false);
+  const closeHighlightSubmenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   let maxLevel = 0;
   headings.forEach((h) => {
     if (h.level > maxLevel) maxLevel = h.level;
@@ -80,6 +89,36 @@ export default function OutlineHeader({
   const allThresholds = [10, 20, 30, 40, 50];
   // Only show thresholds that are less than the max children count
   const validThresholds = allThresholds.filter((t) => maxChildren > t);
+
+  const clearHighlightSubmenuCloseTimer = () => {
+    if (closeHighlightSubmenuTimerRef.current !== null) {
+      clearTimeout(closeHighlightSubmenuTimerRef.current);
+      closeHighlightSubmenuTimerRef.current = null;
+    }
+  };
+
+  const openHighlightSubmenu = () => {
+    clearHighlightSubmenuCloseTimer();
+    setHighlightSubmenuOpen(true);
+  };
+
+  const scheduleCloseHighlightSubmenu = () => {
+    clearHighlightSubmenuCloseTimer();
+    closeHighlightSubmenuTimerRef.current = setTimeout(() => {
+      setHighlightSubmenuOpen(false);
+      closeHighlightSubmenuTimerRef.current = null;
+    }, 120);
+  };
+
+  useEffect(() => {
+    if (!menuOpen) {
+      clearHighlightSubmenuCloseTimer();
+      setHighlightSubmenuOpen(false);
+    }
+    return () => {
+      clearHighlightSubmenuCloseTimer();
+    };
+  }, [menuOpen]);
 
   return (
     <header
@@ -170,26 +209,49 @@ export default function OutlineHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" container={portalContainer}>
-            <DropdownMenuCheckboxItem
+						<DropdownMenuCheckboxItem
+              checked={nonLeafBlankAreaJump}
+              onCheckedChange={onToggleNonLeafBlankAreaJump}
+            >
+              点击空白跳转而非折叠
+            </DropdownMenuCheckboxItem>
+						<DropdownMenuCheckboxItem
               checked={autoHighlightActive}
               onCheckedChange={onToggleAutoHighlight}
             >
               高亮当前标题
             </DropdownMenuCheckboxItem>
             {autoHighlightActive && (
-              <>
-                <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
-                {([10, 20, 30, 40, 50] as const).map((op) => (
-                  <DropdownMenuCheckboxItem
-                    key={op}
-                    checked={highlightOpacity === op}
-                    onCheckedChange={() => onChangeHighlightOpacity(op)}
-                  >
-                    {op}%
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </>
+              <DropdownMenuSub
+                open={highlightSubmenuOpen}
+                onOpenChange={setHighlightSubmenuOpen}
+              >
+                <DropdownMenuSubTrigger
+                  onPointerMove={openHighlightSubmenu}
+                  onPointerLeave={scheduleCloseHighlightSubmenu}
+                  onClick={openHighlightSubmenu}
+                >
+                  高亮透明度
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  container={portalContainer}
+                  onPointerEnter={openHighlightSubmenu}
+                  onPointerLeave={scheduleCloseHighlightSubmenu}
+                >
+                  <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
+                  {([10, 20, 30, 40, 50] as const).map((op) => (
+                    <DropdownMenuCheckboxItem
+                      key={op}
+                      checked={highlightOpacity === op}
+                      onCheckedChange={() => onChangeHighlightOpacity(op)}
+                    >
+                      {op}%
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             )}
+
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Show Levels</DropdownMenuLabel>
             {Array.from({ length: Math.min(levelLimit, 6) }, (_, i) => i + 1).map(

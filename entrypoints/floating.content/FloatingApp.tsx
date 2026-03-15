@@ -19,6 +19,9 @@ import {
 } from '@/lib/types';
 import '@/assets/main.css';
 
+const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
+const ACTIVE_HEADING_TOLERANCE_PX = 12;
+
 interface FloatingAppProps {
   registerCommand: (fn: (cmd: 'show' | 'hide' | 'toggle') => void) => void;
   initialCommand: 'show' | 'hide' | 'toggle';
@@ -333,10 +336,30 @@ export default function FloatingApp({
 
   // Jump to heading
   const jumpTo = useCallback((index: number) => {
+    if (settings.autoHighlightActive) {
+      setActiveIndex(index);
+    }
     const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
     const el = els[index] as HTMLElement | undefined;
-    el?.scrollIntoView({ behavior: 'instant', block: 'start' });
-  }, []);
+    if (!el) return;
+
+    if (!settings.autoHighlightActive) {
+      el.scrollIntoView({ behavior: 'instant', block: 'start' });
+      return;
+    }
+
+    const threshold = window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO;
+    const desiredTop = Math.max(threshold - ACTIVE_HEADING_TOLERANCE_PX, 0);
+    const targetTop = window.scrollY + el.getBoundingClientRect().top - desiredTop;
+    const maxTop = Math.max(
+      document.documentElement.scrollHeight - window.innerHeight,
+      0,
+    );
+    window.scrollTo({
+      top: Math.min(Math.max(targetTop, 0), maxTop),
+      behavior: 'instant',
+    });
+  }, [settings.autoHighlightActive]);
 
   // Select/highlight heading text
   const selectRange = useCallback((index: number) => {
@@ -374,6 +397,17 @@ export default function FloatingApp({
     });
   }, []);
 
+  const toggleNonLeafBlankAreaJump = useCallback(() => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        nonLeafBlankAreaJump: !prev.nonLeafBlankAreaJump,
+      };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   // Detect which heading is currently in view using scroll polling (floating runs in page context)
   useEffect(() => {
     if (!settings.autoHighlightActive || !visible) {
@@ -386,7 +420,9 @@ export default function FloatingApp({
         document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
       ) as HTMLElement[];
       if (els.length === 0) return -1;
-      const threshold = window.innerHeight * 0.2;
+      const threshold =
+        window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO +
+        ACTIVE_HEADING_TOLERANCE_PX;
       let active = 0;
       for (let i = 0; i < els.length; i++) {
         const rect = els[i].getBoundingClientRect();
@@ -557,6 +593,7 @@ export default function FloatingApp({
           isRefreshing={isRefreshing}
           autoHighlightActive={settings.autoHighlightActive}
           highlightOpacity={settings.highlightOpacity}
+          nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
           portalContainer={portalContainer}
           onDragHandleMouseDown={handleDragStart}
           onRefresh={refreshTOC}
@@ -569,6 +606,7 @@ export default function FloatingApp({
           onSwitchMode={switchToSidebar}
           onToggleAutoHighlight={toggleAutoHighlight}
           onChangeHighlightOpacity={changeHighlightOpacity}
+          onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
           onClose={hidePanel}
         />
 
@@ -580,6 +618,7 @@ export default function FloatingApp({
             onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             highlightOpacity={settings.highlightOpacity}
+            nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
             onJump={jumpTo}
             onHighlight={selectRange}
           />

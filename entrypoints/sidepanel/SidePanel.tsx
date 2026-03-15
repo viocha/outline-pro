@@ -17,6 +17,9 @@ import {
   saveScrollState,
 } from '@/lib/types';
 
+const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
+const ACTIVE_HEADING_TOLERANCE_PX = 12;
+
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   let timer: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
@@ -105,12 +108,6 @@ export default function SidePanel() {
         setHeadings([]);
         setError('未发现标题大纲');
       }
-
-      // Setup content observer in the target page
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id! },
-        func: setupContentObserver,
-      });
     } catch (err) {
       console.error('刷新失败:', err);
       setError('无法读取页面');
@@ -197,16 +194,46 @@ export default function SidePanel() {
 
   const jumpTo = useCallback((index: number) => {
     if (currentTabIdRef.current === null) return;
+    if (settings.autoHighlightActive) {
+      setActiveIndex(index);
+    }
     chrome.scripting.executeScript({
       target: { tabId: currentTabIdRef.current },
-      args: [index],
-      func: (idx: number) => {
+      args: [
+        index,
+        settings.autoHighlightActive,
+        ACTIVE_HEADING_VIEWPORT_RATIO,
+        ACTIVE_HEADING_TOLERANCE_PX,
+      ],
+      func: (
+        idx: number,
+        alignToHighlight: boolean,
+        viewportRatio: number,
+        tolerancePx: number,
+      ) => {
         const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        if (els[idx])
-          els[idx].scrollIntoView({ behavior: 'instant', block: 'start' });
+        const el = els[idx] as HTMLElement | undefined;
+        if (!el) return;
+
+        if (!alignToHighlight) {
+          el.scrollIntoView({ behavior: 'instant', block: 'start' });
+          return;
+        }
+
+        const threshold = window.innerHeight * viewportRatio;
+        const desiredTop = Math.max(threshold - tolerancePx, 0);
+        const targetTop = window.scrollY + el.getBoundingClientRect().top - desiredTop;
+        const maxTop = Math.max(
+          document.documentElement.scrollHeight - window.innerHeight,
+          0,
+        );
+        window.scrollTo({
+          top: Math.min(Math.max(targetTop, 0), maxTop),
+          behavior: 'instant',
+        });
       },
     });
-  }, []);
+  }, [settings.autoHighlightActive]);
 
   const selectRange = useCallback((index: number) => {
     if (currentTabIdRef.current === null) return;
@@ -257,6 +284,17 @@ export default function SidePanel() {
     });
   }, []);
 
+  const toggleNonLeafBlankAreaJump = useCallback(() => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        nonLeafBlankAreaJump: !prev.nonLeafBlankAreaJump,
+      };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   // Detect which heading is currently in view (sidepanel runs in extension context)
   useEffect(() => {
     if (!settings.autoHighlightActive || currentTabIdRef.current === null) {
@@ -270,13 +308,15 @@ export default function SidePanel() {
       chrome.scripting
         .executeScript({
           target: { tabId: currentTabIdRef.current },
-          func: () => {
+          args: [ACTIVE_HEADING_VIEWPORT_RATIO, ACTIVE_HEADING_TOLERANCE_PX],
+          func: (viewportRatio: number, tolerancePx: number) => {
             const els = Array.from(
               document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
             ) as HTMLElement[];
             if (els.length === 0) return -1;
             // Find the last heading whose top is at or above 20% of viewport
-            const threshold = window.innerHeight * 0.2;
+            const threshold =
+              window.innerHeight * viewportRatio + tolerancePx;
             let active = 0;
             for (let i = 0; i < els.length; i++) {
               const rect = els[i].getBoundingClientRect();
@@ -321,21 +361,6 @@ export default function SidePanel() {
     ) => {
       if (!tab.active) return;
 
-      if (info.url) {
-        // URL changed: inject a DOMContentLoaded-time notifier.
-        // executeScript without injectImmediately runs at document_idle
-        // (after DOMContentLoaded, before load), so the outline updates
-        // as soon as text is rendered, without waiting for images/styles.
-        chrome.scripting
-          .executeScript({
-            target: { tabId },
-            func: () => {
-              chrome.runtime.sendMessage({ action: 'AUTO_REFRESH' }).catch(() => {});
-            },
-          })
-          .catch(() => {});
-      }
-
       // Keep 'complete' as fallback for pages that add headings late
       if (info.status === 'complete') {
         debouncedRefresh();
@@ -364,6 +389,7 @@ export default function SidePanel() {
         isRefreshing={isRefreshing}
         autoHighlightActive={settings.autoHighlightActive}
         highlightOpacity={settings.highlightOpacity}
+        nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
         onRefresh={refreshTOC}
         onCollapseAll={() => treeRef.current?.collapseAll()}
         onExpandAll={() => treeRef.current?.expandAll()}
@@ -372,6 +398,7 @@ export default function SidePanel() {
         onSwitchMode={switchToFloating}
         onToggleAutoHighlight={toggleAutoHighlight}
         onChangeHighlightOpacity={changeHighlightOpacity}
+        onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
       />
       <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
         {error ? (
@@ -384,6 +411,7 @@ export default function SidePanel() {
             onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             highlightOpacity={settings.highlightOpacity}
+            nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
             onJump={jumpTo}
             onHighlight={selectRange}
           />
@@ -391,66 +419,4 @@ export default function SidePanel() {
       </ScrollArea>
     </div>
   );
-}
-
-// Injected into the page to detect heading changes
-function setupContentObserver() {
-  if ((window as any).hasOutlineObserver) return;
-  (window as any).hasOutlineObserver = true;
-
-  function debounce(func: () => void, wait: number) {
-    let timeout: ReturnType<typeof setTimeout>;
-    return () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(func, wait);
-    };
-  }
-
-  const sendUpdate = debounce(() => {
-    chrome.runtime.sendMessage({ action: 'AUTO_REFRESH' });
-  }, 300);
-
-  const observer = new MutationObserver((mutations) => {
-    let shouldRefresh = false;
-    for (const mutation of mutations) {
-      if (mutation.type === 'characterData') {
-        if (
-          mutation.target.parentNode &&
-          /^H[1-6]$/i.test((mutation.target.parentNode as Element).tagName)
-        ) {
-          shouldRefresh = true;
-          break;
-        }
-      } else if (mutation.type === 'childList') {
-        const checkNode = (n: Node) =>
-          n.nodeType === 1 &&
-          (/^H[1-6]$/i.test((n as Element).tagName) ||
-            (n as Element).querySelector('h1,h2,h3,h4,h5,h6'));
-        for (const node of mutation.addedNodes) {
-          if (checkNode(node)) {
-            shouldRefresh = true;
-            break;
-          }
-        }
-        if (!shouldRefresh) {
-          for (const node of mutation.removedNodes) {
-            if (checkNode(node)) {
-              shouldRefresh = true;
-              break;
-            }
-          }
-        }
-      }
-      if (shouldRefresh) break;
-    }
-    if (shouldRefresh) sendUpdate();
-  });
-
-  if (document.body) {
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-  }
 }

@@ -13,6 +13,20 @@ import { cn } from '@/lib/utils';
 import type { TreeNode, HeadingItem } from '@/lib/types';
 import { buildTree } from '@/lib/types';
 
+const ACTIVE_ROW_HIGHLIGHT_CLASS_MAP = {
+  10: 'bg-violet-100/10',
+  20: 'bg-violet-100/20',
+  30: 'bg-violet-100/30',
+  40: 'bg-violet-100/40',
+  50: 'bg-violet-100/50',
+} as const;
+
+function getActiveRowHighlightClass(opacity: number) {
+  return ACTIVE_ROW_HIGHLIGHT_CLASS_MAP[
+    opacity as keyof typeof ACTIVE_ROW_HIGHLIGHT_CLASS_MAP
+  ] ?? ACTIVE_ROW_HIGHLIGHT_CLASS_MAP[30];
+}
+
 /** Return the indices of all ancestor (non-leaf) nodes of the node with targetIndex */
 function findAncestors(nodes: TreeNode[], targetIndex: number): number[] {
   const result: number[] = [];
@@ -45,6 +59,7 @@ interface OutlineTreeProps {
   onCollapsedSetChange: (set: Set<number>) => void;
   activeIndex?: number;
   highlightOpacity?: number;
+  nonLeafBlankAreaJump?: boolean;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
 }
@@ -57,7 +72,16 @@ interface ContextMenuState {
 }
 
 const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
-  ({ headings, collapsedSet, onCollapsedSetChange, activeIndex, highlightOpacity = 30, onJump, onHighlight }, ref) => {
+  ({
+    headings,
+    collapsedSet,
+    onCollapsedSetChange,
+    activeIndex,
+    highlightOpacity = 30,
+    nonLeafBlankAreaJump = false,
+    onJump,
+    onHighlight,
+  }, ref) => {
     const tree = useMemo(() => buildTree(headings), [headings]);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -290,6 +314,7 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
             collapsedSet={collapsedSet}
             activeIndex={activeIndex}
             highlightOpacity={highlightOpacity}
+            nonLeafBlankAreaJump={nonLeafBlankAreaJump}
             onToggle={toggleCollapse}
             onJump={onJump}
             onHighlight={onHighlight}
@@ -349,6 +374,7 @@ interface TreeNodeItemProps {
   collapsedSet: Set<number>;
   activeIndex?: number;
   highlightOpacity?: number;
+  nonLeafBlankAreaJump?: boolean;
   onToggle: (index: number) => void;
   onJump: (index: number) => void;
   onHighlight: (index: number) => void;
@@ -368,6 +394,7 @@ function TreeNodeItem({
   collapsedSet,
   activeIndex,
   highlightOpacity = 30,
+  nonLeafBlankAreaJump = false,
   onToggle,
   onJump,
   onHighlight,
@@ -382,6 +409,7 @@ function TreeNodeItem({
   const shouldKeepTextHighlight = isContextMenuOpen && contextMenuHighlightText;
   const level = node.heading.level;
   const textRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLDivElement>(null);
 
   const fontSizeClass =
     level <= 2
@@ -390,8 +418,22 @@ function TreeNodeItem({
         ? 'text-[12.5px]'
         : 'text-xs';
 
-  const handleHeaderClick = () => {
+  const handleHeaderClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isLeaf) {
+      onJump(node.index);
+      return;
+    }
+
+    if (
+      toggleRef.current &&
+      e.target instanceof Node &&
+      toggleRef.current.contains(e.target)
+    ) {
+      onToggle(node.index);
+      return;
+    }
+
+    if (nonLeafBlankAreaJump) {
       onJump(node.index);
     } else {
       onToggle(node.index);
@@ -435,20 +477,17 @@ function TreeNodeItem({
           'group flex items-center py-[2px] pr-1 cursor-pointer rounded select-none transition-colors duration-100',
           'min-w-full w-fit box-border',
           'hover:bg-bg-hover',
+          isActive && !isContextMenuOpen && getActiveRowHighlightClass(highlightOpacity),
           isContextMenuOpen && 'bg-bg-hover',
         )}
-        style={{
-          paddingLeft: depth * 18,
-          ...(isActive && !isContextMenuOpen
-            ? { backgroundColor: `rgb(209 250 229 / ${highlightOpacity}%)` }
-            : {}),
-        }}
+        style={{ paddingLeft: depth * 18 }}
         onClick={handleHeaderClick}
         onDoubleClick={handleHeaderDblClick}
         onContextMenu={handleContextMenu}
       >
         {/* Toggle icon */}
         <div
+          ref={toggleRef}
           className={cn(
             'mr-0.5 flex size-[1.2em] shrink-0 items-center justify-center rounded text-text-dim',
             'hover:bg-accent hover:text-muted-foreground',
@@ -466,7 +505,9 @@ function TreeNodeItem({
         <div
           className={cn(
             'whitespace-nowrap leading-[1.4] text-foreground/90 transition-colors duration-100',
-            isLeaf ? 'group-hover:text-primary' : 'hover:text-primary',
+            isLeaf || nonLeafBlankAreaJump
+              ? 'group-hover:text-primary'
+              : 'hover:text-primary',
             shouldKeepTextHighlight && 'text-primary',
             fontSizeClass,
           )}
@@ -490,6 +531,7 @@ function TreeNodeItem({
               collapsedSet={collapsedSet}
               activeIndex={activeIndex}
               highlightOpacity={highlightOpacity}
+              nonLeafBlankAreaJump={nonLeafBlankAreaJump}
               onToggle={onToggle}
               onJump={onJump}
               onHighlight={onHighlight}

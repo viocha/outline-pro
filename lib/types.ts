@@ -60,11 +60,14 @@ export interface Settings {
   autoHighlightActive: boolean;
   /** 高亮背景色透明度 (%) */
   highlightOpacity: 10 | 20 | 30 | 40 | 50;
+  /** 非叶子节点点击空白处时是否跳转到标题 */
+  nonLeafBlankAreaJump: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  autoHighlightActive: true,
+  autoHighlightActive: false,
   highlightOpacity: 30,
+  nonLeafBlankAreaJump: false,
 };
 
 export const SETTINGS_KEY = 'outline_pro_settings';
