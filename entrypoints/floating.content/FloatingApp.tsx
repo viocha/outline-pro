@@ -34,6 +34,20 @@ type ResizeDirection =
   | 'bottom-left'
   | 'bottom-right';
 
+type FloatingPanelPosition = {
+  top: string;
+  right: string;
+  width: string;
+  height: string;
+};
+
+const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
+  top: '50px',
+  right: '20px',
+  width: '300px',
+  height: '500px',
+};
+
 export default function FloatingApp({
   registerCommand,
   initialCommand,
@@ -81,15 +95,12 @@ export default function FloatingApp({
   }, []);
 
   // Position state
-  const [position, setPosition] = useState({
-    top: '50px',
-    right: '20px',
-    width: '300px',
-    height: '500px',
+  const [position, setPosition] = useState<FloatingPanelPosition>({
+    ...DEFAULT_FLOATING_POSITION,
   });
 
   const savePanelState = useCallback(
-    (isVisible: boolean, pos?: typeof position) => {
+    (isVisible: boolean, pos?: FloatingPanelPosition) => {
       const p = pos ?? position;
       const state: FloatingState = {
         isVisible,
@@ -110,23 +121,26 @@ export default function FloatingApp({
         resolve(s),
       );
     });
-    if (state) {
-      const newPos = {
-        top: state.top || '50px',
-        right: state.right || '20px',
-        width: state.width || '300px',
-        height: state.height || '500px',
-      };
-      setPosition(newPos);
-      // Save isVisible=true using the loaded state object directly.
-      // Do NOT call savePanelState() here — its position closure is stale
-      // (React hasn't committed setPosition yet), which would overwrite the
-      // correct saved position with the default values.
-      chrome.runtime.sendMessage({
-        action: 'SAVE_FLOATING_STATE',
-        state: { ...state, isVisible: true },
-      });
-    }
+    const nextPosition = state
+      ? {
+          top: state.top || DEFAULT_FLOATING_POSITION.top,
+          right: state.right || DEFAULT_FLOATING_POSITION.right,
+          width: state.width || DEFAULT_FLOATING_POSITION.width,
+          height: state.height || DEFAULT_FLOATING_POSITION.height,
+        }
+      : { ...DEFAULT_FLOATING_POSITION };
+
+    setPosition(nextPosition);
+    // Persist visibility immediately so refresh/same-tab navigation can
+    // restore the floating panel even when the user never drags/resizes it.
+    chrome.runtime.sendMessage({
+      action: 'SAVE_FLOATING_STATE',
+      state: {
+        ...(state ?? {}),
+        ...nextPosition,
+        isVisible: true,
+      },
+    });
     setIsInitializing(true);
     setVisible(true);
   }, []);
