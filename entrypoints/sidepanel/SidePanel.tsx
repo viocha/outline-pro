@@ -84,14 +84,19 @@ export default function SidePanel() {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id! },
         func: () => {
-          const tags = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-          return Array.from(tags)
+          return Array.from(
+            document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+          )
+            .filter(
+              (el): el is HTMLElement =>
+                el instanceof HTMLElement &&
+                el.innerText.trim().replaceAll('\n', ' ').length > 0,
+            )
             .map((t) => ({
               tag: t.tagName,
-              text: (t as HTMLElement).innerText.trim().replaceAll('\n', ' '),
+              text: t.innerText.trim().replaceAll('\n', ' '),
               id: t.id,
-            }))
-            .filter((h) => h.text.length > 0);
+            }));
         },
       });
 
@@ -214,8 +219,14 @@ export default function SidePanel() {
         viewportRatio: number,
         tolerancePx: number,
       ) => {
-        const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        const el = els[idx] as HTMLElement | undefined;
+        const els = Array.from(
+          document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+        ).filter(
+          (node): node is HTMLElement =>
+            node instanceof HTMLElement &&
+            node.innerText.trim().replaceAll('\n', ' ').length > 0,
+        );
+        const el = els[idx];
         if (!el) return;
 
         if (!alignToHighlight) {
@@ -244,7 +255,13 @@ export default function SidePanel() {
       target: { tabId: currentTabIdRef.current },
       args: [index],
       func: (idx: number) => {
-        const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const els = Array.from(
+          document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+        ).filter(
+          (node): node is HTMLElement =>
+            node instanceof HTMLElement &&
+            node.innerText.trim().replaceAll('\n', ' ').length > 0,
+        );
         const startNode = els[idx];
         if (!startNode) return;
         const range = document.createRange();
@@ -315,7 +332,11 @@ export default function SidePanel() {
           func: (viewportRatio: number, tolerancePx: number) => {
             const els = Array.from(
               document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-            ) as HTMLElement[];
+            ).filter(
+              (node): node is HTMLElement =>
+                node instanceof HTMLElement &&
+                node.innerText.trim().replaceAll('\n', ' ').length > 0,
+            );
             if (els.length === 0) return -1;
             // Find the last heading whose top is at or above 20% of viewport
             const threshold =

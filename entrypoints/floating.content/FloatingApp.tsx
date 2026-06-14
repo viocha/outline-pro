@@ -48,6 +48,16 @@ const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
   height: '500px',
 };
 
+function getOutlineHeadingElements(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+  ).filter(
+    (el): el is HTMLElement =>
+      el instanceof HTMLElement &&
+      el.innerText.trim().replaceAll('\n', ' ').length > 0,
+  );
+}
+
 export default function FloatingApp({
   registerCommand,
   initialCommand,
@@ -180,14 +190,12 @@ export default function FloatingApp({
 
   // Refresh TOC
   const refreshTOC = useCallback((opts: { silent?: boolean } = {}) => {
-    const tags = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    const raw = Array.from(tags)
+    const raw = getOutlineHeadingElements()
       .map((t) => ({
         tag: t.tagName,
-        text: (t as HTMLElement).innerText.trim().replaceAll('\n', ' '),
+        text: t.innerText.trim().replaceAll('\n', ' '),
         id: t.id,
-      }))
-      .filter((h) => h.text.length > 0);
+      }));
     const normalized = normalizeHeadings(raw);
     const fp = headingsFingerprint(normalized);
     // Skip spinner if called silently and headings haven't changed
@@ -353,8 +361,7 @@ export default function FloatingApp({
     if (settings.autoHighlightActive) {
       setActiveIndex(index);
     }
-    const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    const el = els[index] as HTMLElement | undefined;
+    const el = getOutlineHeadingElements()[index];
     if (!el) return;
 
     if (!settings.autoHighlightActive) {
@@ -377,8 +384,7 @@ export default function FloatingApp({
 
   // Select/highlight heading text
   const selectRange = useCallback((index: number) => {
-    const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    const el = els[index] as HTMLElement | undefined;
+    const el = getOutlineHeadingElements()[index];
     if (!el) return;
     const range = document.createRange();
     const selection = window.getSelection();
@@ -430,9 +436,7 @@ export default function FloatingApp({
     }
 
     const getActive = () => {
-      const els = Array.from(
-        document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-      ) as HTMLElement[];
+      const els = getOutlineHeadingElements();
       if (els.length === 0) return -1;
       const threshold =
         window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO +
