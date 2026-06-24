@@ -1,4 +1,7 @@
-import type { FloatingState } from '@/lib/types';
+import {
+  DEFAULT_FLOATING_POSITION,
+  type FloatingState,
+} from '@/lib/types';
 
 /**
  * Background Service Worker
@@ -12,6 +15,11 @@ export default defineBackground(() => {
         title: '切换浮动大纲',
         contexts: ['action'],
       });
+      chrome.contextMenus.create({
+        id: 'reset_floating_outline',
+        title: '重置浮动大纲',
+        contexts: ['action'],
+      });
     });
   });
 
@@ -21,6 +29,8 @@ export default defineBackground(() => {
     if (info.menuItemId === 'toggle_floating_action') {
       chrome.runtime.sendMessage({ action: 'CLOSE_SIDEPANEL' }).catch(() => {});
       toggleFloatingPanel(tab.id, 'TOGGLE_FLOATING_PANEL');
+    } else if (info.menuItemId === 'reset_floating_outline') {
+      resetFloatingPanel(tab.id);
     }
   });
 
@@ -172,6 +182,28 @@ export default defineBackground(() => {
   function isRestrictedUrl(url?: string): boolean {
     if (!url) return true;
     return RESTRICTED_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
+  }
+
+  async function resetFloatingPanel(tabId: number) {
+    const key = `floating_state_${tabId}`;
+    const data = await chrome.storage.local.get(key) as Record<
+      string,
+      FloatingState | undefined
+    >;
+    const state = data[key];
+
+    if (state) {
+      await chrome.storage.local.set({
+        [key]: {
+          ...state,
+          ...DEFAULT_FLOATING_POSITION,
+        },
+      });
+    }
+
+    chrome.tabs
+      .sendMessage(tabId, { action: 'RESET_FLOATING_PANEL' })
+      .catch(() => {});
   }
 
   async function toggleFloatingPanel(tabId: number, actionType: string) {

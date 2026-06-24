@@ -55,6 +55,15 @@ export type FloatingState = {
   height: string;
 };
 
+export type FloatingPanelPosition = Omit<FloatingState, 'isVisible'>;
+
+export const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
+  top: '50px',
+  right: '20px',
+  width: '300px',
+  height: '500px',
+};
+
 export interface Settings {
   /** 是否自动高亮目录中当前浏览的标题 */
   autoHighlightActive: boolean;

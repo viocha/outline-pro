@@ -6,7 +6,9 @@ import {
   normalizeHeadings,
   type HeadingItem,
   type FloatingState,
+  type FloatingPanelPosition,
   type Settings,
+  DEFAULT_FLOATING_POSITION,
   DEFAULT_SETTINGS,
   loadSettings,
   saveSettings,
@@ -23,7 +25,9 @@ const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
 const ACTIVE_HEADING_TOLERANCE_PX = 12;
 
 interface FloatingAppProps {
-  registerCommand: (fn: (cmd: 'show' | 'hide' | 'toggle') => void) => void;
+  registerCommand: (
+    fn: (cmd: 'show' | 'hide' | 'toggle' | 'reset') => void,
+  ) => void;
   initialCommand: 'show' | 'hide' | 'toggle';
 }
 
@@ -33,20 +37,6 @@ type ResizeDirection =
   | 'bottom'
   | 'bottom-left'
   | 'bottom-right';
-
-type FloatingPanelPosition = {
-  top: string;
-  right: string;
-  width: string;
-  height: string;
-};
-
-const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
-  top: '50px',
-  right: '20px',
-  width: '300px',
-  height: '500px',
-};
 
 function getOutlineHeadingElements(): HTMLElement[] {
   return Array.from(
@@ -160,6 +150,12 @@ export default function FloatingApp({
     savePanelState(false);
   }, [savePanelState]);
 
+  const resetPanel = useCallback(() => {
+    const nextPosition = { ...DEFAULT_FLOATING_POSITION };
+    setPosition(nextPosition);
+    savePanelState(visibleRef.current, nextPosition);
+  }, [savePanelState]);
+
   // Register command handler
   useEffect(() => {
     registerCommand((cmd) => {
@@ -176,9 +172,11 @@ export default function FloatingApp({
         } else {
           showPanel();
         }
+      } else if (cmd === 'reset') {
+        resetPanel();
       }
     });
-  }, [registerCommand, showPanel, hidePanel]);
+  }, [registerCommand, showPanel, hidePanel, resetPanel]);
 
   // Process initial command
   useEffect(() => {

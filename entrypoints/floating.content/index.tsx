@@ -17,6 +17,8 @@ export default defineContentScript({
         ensureUI(ctx, 'hide');
       } else if (msg.action === 'TOGGLE_FLOATING_PANEL') {
         ensureUI(ctx, 'toggle');
+      } else if (msg.action === 'RESET_FLOATING_PANEL') {
+        showCommand?.('reset');
       }
     });
 
@@ -30,7 +32,9 @@ export default defineContentScript({
 });
 
 let uiMountPromise: Promise<void> | null = null;
-let showCommand: ((cmd: 'show' | 'hide' | 'toggle') => void) | null = null;
+let showCommand: (
+  (cmd: 'show' | 'hide' | 'toggle' | 'reset') => void
+) | null = null;
 let pendingCommand: 'show' | 'hide' | 'toggle' = 'show';
 
 async function ensureUI(ctx: any, cmd: 'show' | 'hide' | 'toggle') {
