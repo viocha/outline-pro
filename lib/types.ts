@@ -59,9 +59,9 @@ export type FloatingPanelPosition = Omit<FloatingState, 'isVisible'>;
 
 export const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
   top: '50px',
-  right: '20px',
+  right: '10px',
   width: '300px',
-  height: '500px',
+  height: '700px',
 };
 
 export interface Settings {
