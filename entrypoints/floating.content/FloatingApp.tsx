@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from 'react';
 import OutlineHeader from '@/components/OutlineHeader';
 import OutlineTree, { type OutlineTreeRef } from '@/components/OutlineTree';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +44,13 @@ type ResizeDirection =
   | 'bottom-left'
   | 'bottom-right';
 
+type HeadingsUpdateMode = 'reset' | 'restore' | 'preserve';
+
+interface RefreshOptions {
+  silent?: boolean;
+  preserveView?: boolean;
+}
+
 function getOutlineHeadingElements(): HTMLElement[] {
   return Array.from(
     document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
@@ -63,10 +76,9 @@ export default function FloatingApp({
   const hostRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
   const headingsFpRef = useRef('');
-  // Whether the NEXT headings effect should restore saved state.
-  // Only true when panel is reopened with UNCHANGED headings (silent+same fp).
-  // False for page refresh / mutation-triggered updates → always reset.
-  const shouldRestoreRef = useRef(false);
+  // Controls how the next headings update treats the user's tree viewport.
+  const headingsUpdateModeRef = useRef<HeadingsUpdateMode>('reset');
+  const preservedScrollTopRef = useRef<number | null>(null);
   // Tracks visible without being stale in command-handler closures
   const visibleRef = useRef(false);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -187,7 +199,7 @@ export default function FloatingApp({
   }, []);
 
   // Refresh TOC
-  const refreshTOC = useCallback((opts: { silent?: boolean } = {}) => {
+  const refreshTOC = useCallback((opts: RefreshOptions = {}) => {
     const raw = getOutlineHeadingElements()
       .map((t) => ({
         tag: t.tagName,
@@ -196,22 +208,48 @@ export default function FloatingApp({
       }));
     const normalized = normalizeHeadings(raw);
     const fp = headingsFingerprint(normalized);
+    const currentFp = headingsFpRef.current;
+
+    // Mutation observers can report several DOM changes that resolve to the
+    // same outline. Avoid replacing the headings array in that case.
+    if (opts.preserveView && currentFp === fp) return;
+
     // Skip spinner if called silently and headings haven't changed
     const unchanged =
-      !!opts.silent && headingsFpRef.current === fp && headingsFpRef.current !== '';
-    // Mark that the next headings effect should RESTORE saved state (panel reopen,
-    // same headings). For refresh / mutation updates this stays false → reset.
-    shouldRestoreRef.current = unchanged;
-    if (!unchanged) {
+      !!opts.silent && currentFp === fp && currentFp !== '';
+
+    if (opts.preserveView) {
+      headingsUpdateModeRef.current = 'preserve';
+      preservedScrollTopRef.current =
+        scrollViewportRef.current?.scrollTop ?? null;
+    } else {
+      headingsUpdateModeRef.current = unchanged ? 'restore' : 'reset';
+      preservedScrollTopRef.current = null;
+    }
+
+    if (!opts.silent && !unchanged) {
       setIsRefreshing(true);
       setTimeout(() => setIsRefreshing(false), 500);
     }
     setHeadings(normalized);
   }, []);
 
+  // React keeps the viewport element mounted, but restoring its exact offset
+  // before paint also covers updates that replace/reflow many outline rows.
+  useLayoutEffect(() => {
+    if (headingsUpdateModeRef.current !== 'preserve') return;
+    const scrollTop = preservedScrollTopRef.current;
+    preservedScrollTopRef.current = null;
+    if (scrollTop !== null && scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTop = scrollTop;
+    }
+  }, [headings]);
+
   // Smart collapse / restore after headings change
   useEffect(() => {
     if (headings.length === 0) {
+      headingsUpdateModeRef.current = 'reset';
+      preservedScrollTopRef.current = null;
       setCollapsedSet(new Set());
       setPendingScrollTop(null);
       setIsInitializing(false);
@@ -220,10 +258,15 @@ export default function FloatingApp({
     const fp = headingsFingerprint(headings);
     headingsFpRef.current = fp;
 
-    const shouldRestore = shouldRestoreRef.current;
-    shouldRestoreRef.current = false;
+    const updateMode = headingsUpdateModeRef.current;
+    headingsUpdateModeRef.current = 'reset';
 
-    if (shouldRestore) {
+    if (updateMode === 'preserve') {
+      // Live page mutations (for example an AI response being generated)
+      // update the rows without changing scroll or collapse state.
+      setPendingScrollTop(null);
+      setIsInitializing(false);
+    } else if (updateMode === 'restore') {
       // Panel reopened with unchanged headings → restore saved collapse + scroll
       Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
         if (collapse?.fingerprint === fp) {
@@ -240,7 +283,7 @@ export default function FloatingApp({
         }
       }).catch(() => setIsInitializing(false));
     } else {
-      // Page refreshed or headings mutated → reset to default state, no restore
+      // Manual refresh or a genuinely new page → reset to the default state.
       setPendingScrollTop(null);
       const vp = scrollViewportRef.current;
       if (vp) vp.scrollTop = 0;
@@ -309,7 +352,10 @@ export default function FloatingApp({
         timer = setTimeout(fn, ms);
       };
     };
-    const debouncedRefresh = debounce(refreshTOC, 300);
+    const debouncedRefresh = debounce(
+      () => refreshTOC({ silent: true, preserveView: true }),
+      300,
+    );
     const observer = new MutationObserver((mutations) => {
       let shouldRefresh = false;
       for (const mutation of mutations) {

@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from 'react';
 import OutlineHeader from '@/components/OutlineHeader';
 import OutlineTree, { type OutlineTreeRef } from '@/components/OutlineTree';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,6 +25,13 @@ import {
 
 const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
 const ACTIVE_HEADING_TOLERANCE_PX = 12;
+
+type HeadingsUpdateMode = 'reset' | 'restore' | 'preserve';
+
+interface RefreshOptions {
+  silent?: boolean;
+  preserveView?: boolean;
+}
 
 function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void | Promise<void>,
@@ -41,10 +54,8 @@ export default function SidePanel() {
   const treeRef = useRef<OutlineTreeRef>(null);
   const currentTabIdRef = useRef<number | null>(null);
   const headingsFpRef = useRef('');
-  // Only true when the next headings effect should restore saved state
-  // (initial silent load with unchanged headings). Non-silent calls (tab update,
-  // mutation, manual refresh) keep this false so state is always reset.
-  const shouldRestoreRef = useRef(false);
+  const headingsUpdateModeRef = useRef<HeadingsUpdateMode>('reset');
+  const preservedScrollTopRef = useRef<number | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const [pendingScrollTop, setPendingScrollTop] = useState<number | null>(null);
 
@@ -65,7 +76,7 @@ export default function SidePanel() {
     return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
 
-  const refreshTOC = useCallback(async (opts: { silent?: boolean } = {}) => {
+  const refreshTOC = useCallback(async (opts: RefreshOptions = {}) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (
       !tab?.url ||
@@ -102,14 +113,26 @@ export default function SidePanel() {
 
       if (results?.[0]?.result) {
         const normalized = normalizeHeadings(results[0].result);
-        if (!opts.silent) {
+        const fp = headingsFingerprint(normalized);
+        const currentFp = headingsFpRef.current;
+
+        // Ignore observer noise when the effective outline did not change.
+        if (opts.preserveView && currentFp === fp) return;
+
+        if (opts.preserveView) {
+          headingsUpdateModeRef.current = 'preserve';
+          preservedScrollTopRef.current =
+            scrollViewportRef.current?.scrollTop ?? null;
+        } else if (!opts.silent) {
           willSpin = true;
+          headingsUpdateModeRef.current = 'reset';
+          preservedScrollTopRef.current = null;
         } else {
           const saved = await loadCollapseState();
-          willSpin = saved?.fingerprint !== headingsFingerprint(normalized);
+          willSpin = saved?.fingerprint !== fp;
+          headingsUpdateModeRef.current = willSpin ? 'reset' : 'restore';
+          preservedScrollTopRef.current = null;
         }
-        // Restore saved state only on silent+unchanged open; reset on any real refresh
-        shouldRestoreRef.current = !willSpin;
         if (willSpin) setIsRefreshing(true);
         setHeadings(normalized);
       } else {
@@ -125,9 +148,21 @@ export default function SidePanel() {
     }
   }, []);
 
+  // Reapply the live viewport offset before paint after React updates the rows.
+  useLayoutEffect(() => {
+    if (headingsUpdateModeRef.current !== 'preserve') return;
+    const scrollTop = preservedScrollTopRef.current;
+    preservedScrollTopRef.current = null;
+    if (scrollTop !== null && scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTop = scrollTop;
+    }
+  }, [headings]);
+
   // Restore or reset when headings change
   useEffect(() => {
     if (headings.length === 0) {
+      headingsUpdateModeRef.current = 'reset';
+      preservedScrollTopRef.current = null;
       setCollapsedSet(new Set());
       setPendingScrollTop(null);
       return;
@@ -135,10 +170,14 @@ export default function SidePanel() {
     const fp = headingsFingerprint(headings);
     headingsFpRef.current = fp;
 
-    const shouldRestore = shouldRestoreRef.current;
-    shouldRestoreRef.current = false;
+    const updateMode = headingsUpdateModeRef.current;
+    headingsUpdateModeRef.current = 'reset';
 
-    if (shouldRestore) {
+    if (updateMode === 'preserve') {
+      // Keep the user's position and expanded/collapsed branches while a page
+      // (notably an AI chat response) changes its headings incrementally.
+      setPendingScrollTop(null);
+    } else if (updateMode === 'restore') {
       // Panel opened with unchanged headings → restore saved collapse + scroll
       Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
         if (collapse?.fingerprint === fp) {
@@ -149,7 +188,7 @@ export default function SidePanel() {
         }
       });
     } else {
-      // Tab navigated / refreshed / heading mutation → reset to default
+      // Tab navigation or manual refresh starts from the default state.
       setPendingScrollTop(null);
       const vp = scrollViewportRef.current;
       if (vp) vp.scrollTop = 0;
@@ -374,7 +413,9 @@ export default function SidePanel() {
     const debouncedRefresh = debounce(refreshTOC, 300);
 
     const messageListener = (msg: { action: string }) => {
-      if (msg.action === 'AUTO_REFRESH') debouncedRefresh();
+      if (msg.action === 'AUTO_REFRESH') {
+        debouncedRefresh({ silent: true, preserveView: true });
+      }
       if (msg.action === 'CLOSE_SIDEPANEL') window.close();
     };
 
