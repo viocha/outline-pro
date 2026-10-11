@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useId, useState, type ComponentProps } from 'react';
+import { Input } from '@/components/ui/input';
+import { Field, FieldLabel } from '@/components/ui/field';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -6,6 +14,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuGroup,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
   DropdownMenuSub,
@@ -30,6 +41,8 @@ interface OutlineHeaderProps {
   isRefreshing: boolean;
   autoHighlightActive: boolean;
   highlightOpacity: number;
+  fontSize: number;
+  onChangeFontSize: (value: number) => void;
   nonLeafBlankAreaJump: boolean;
   portalContainer?: HTMLElement | null;
   onDragHandleMouseDown?: (e: React.MouseEvent) => void;
@@ -51,6 +64,8 @@ export default function OutlineHeader({
   isRefreshing,
   autoHighlightActive,
   highlightOpacity,
+  fontSize,
+  onChangeFontSize,
   nonLeafBlankAreaJump,
   portalContainer,
   onDragHandleMouseDown,
@@ -65,10 +80,8 @@ export default function OutlineHeader({
   onToggleNonLeafBlankAreaJump,
   onClose,
 }: OutlineHeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [highlightSubmenuOpen, setHighlightSubmenuOpen] = useState(false);
-  const closeHighlightSubmenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const fontSizeId = useId();
+  const [fontSizeEditing, setFontSizeEditing] = useState(false);
   let maxLevel = 0;
   headings.forEach((h) => {
     if (h.level > maxLevel) maxLevel = h.level;
@@ -91,233 +104,232 @@ export default function OutlineHeader({
   // Only show thresholds that are less than the max children count
   const validThresholds = allThresholds.filter((t) => maxChildren > t);
 
-  const clearHighlightSubmenuCloseTimer = () => {
-    if (closeHighlightSubmenuTimerRef.current !== null) {
-      clearTimeout(closeHighlightSubmenuTimerRef.current);
-      closeHighlightSubmenuTimerRef.current = null;
-    }
-  };
-
-  const openHighlightSubmenu = () => {
-    clearHighlightSubmenuCloseTimer();
-    setHighlightSubmenuOpen(true);
-  };
-
-  const scheduleCloseHighlightSubmenu = () => {
-    clearHighlightSubmenuCloseTimer();
-    closeHighlightSubmenuTimerRef.current = setTimeout(() => {
-      setHighlightSubmenuOpen(false);
-      closeHighlightSubmenuTimerRef.current = null;
-    }, 120);
-  };
-
-  useEffect(() => {
-    if (!menuOpen) {
-      clearHighlightSubmenuCloseTimer();
-      setHighlightSubmenuOpen(false);
-      requestAnimationFrame(() => {
-        menuTriggerRef.current?.blur();
-      });
-    }
-    return () => {
-      clearHighlightSubmenuCloseTimer();
-    };
-  }, [menuOpen]);
-
   return (
-    <header
-      className={cn(
-        'flex h-9 shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 box-border select-none backdrop-blur supports-[backdrop-filter]:bg-background/85',
-        mode === 'floating' && 'cursor-move select-none pr-2',
-      )}
-    >
-      <div
+    <TooltipProvider delay={500} timeout={0}>
+      <header
         className={cn(
-          'text-sm font-semibold tracking-tight text-foreground',
-          mode === 'floating' && 'cursor-move flex-1',
+          'flex h-9 shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 box-border select-none backdrop-blur supports-[backdrop-filter]:bg-background/85',
+          mode === 'floating' && 'cursor-move select-none pr-2',
         )}
-        onMouseDown={mode === 'floating' ? onDragHandleMouseDown : undefined}
       >
-        Outline
-      </div>
-
-      <div className="flex items-center gap-0.5 cursor-default">
-        {/* Switch mode button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title={
-            mode === 'sidepanel' ? '切换到悬浮模式' : '切换到侧边栏'
-          }
-          onClick={onSwitchMode}
-        >
-          {mode === 'sidepanel' ? (
-            <PictureInPicture2 className="size-4" />
-          ) : (
-            <PanelRight className="size-4" />
+        <div
+          className={cn(
+            'min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-foreground',
+            mode === 'floating' && 'cursor-move flex-1',
           )}
-        </Button>
-
-        {/* Collapse all */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title="全部折叠"
-          onClick={onCollapseAll}
+          onMouseDown={mode === 'floating' ? onDragHandleMouseDown : undefined}
         >
-          <Minus className="size-4" />
-        </Button>
+          Outline
+        </div>
 
-        {/* Expand all */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title="全部展开"
-          onClick={onExpandAll}
-        >
-          <Plus className="size-4" />
-        </Button>
-
-        {/* Level menu */}
-        {menuOpen && (
-          <div
-            className="fixed inset-0 z-40"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onPointerUp={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-            }}
-          />
-        )}
-        <DropdownMenu
-          modal={mode !== 'floating'}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-        >
-          <DropdownMenuTrigger asChild>
-            <Button
-              ref={menuTriggerRef}
-              variant="ghost"
-              size="icon"
-              title="选择展开层级"
-            >
-              <Ellipsis className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            container={portalContainer}
-            onCloseAutoFocus={(e) => e.preventDefault()}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {/* Switch mode button */}
+          <ToolbarButton
+            portalContainer={portalContainer}
+            variant="ghost"
+            size="icon-sm"
+            aria-label={
+              mode === 'sidepanel' ? '切换到悬浮模式' : '切换到侧边栏'
+            }
+            label={mode === 'sidepanel' ? '切换到悬浮模式' : '切换到侧边栏'}
+            onClick={onSwitchMode}
           >
-						<DropdownMenuCheckboxItem
-              checked={nonLeafBlankAreaJump}
-              onCheckedChange={onToggleNonLeafBlankAreaJump}
-            >
-              点击空白跳转而非折叠
-            </DropdownMenuCheckboxItem>
-						<DropdownMenuCheckboxItem
-              checked={autoHighlightActive}
-              onCheckedChange={onToggleAutoHighlight}
-            >
-              高亮当前标题
-            </DropdownMenuCheckboxItem>
-            {autoHighlightActive && (
-              <DropdownMenuSub
-                open={highlightSubmenuOpen}
-                onOpenChange={setHighlightSubmenuOpen}
-              >
-                <DropdownMenuSubTrigger
-                  onPointerMove={openHighlightSubmenu}
-                  onPointerLeave={scheduleCloseHighlightSubmenu}
-                  onClick={openHighlightSubmenu}
-                >
-                  高亮透明度
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent
-                  container={portalContainer}
-                  onPointerEnter={openHighlightSubmenu}
-                  onPointerLeave={scheduleCloseHighlightSubmenu}
-                >
-                  <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
-                  {([10, 20, 30, 40, 50] as const).map((op) => (
-                    <DropdownMenuCheckboxItem
-                      key={op}
-                      checked={highlightOpacity === op}
-                      onCheckedChange={() => onChangeHighlightOpacity(op)}
-                    >
-                      {op}%
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
+            {mode === 'sidepanel' ? <PictureInPicture2 /> : <PanelRight />}
+          </ToolbarButton>
 
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Show Levels</DropdownMenuLabel>
-            {Array.from({ length: Math.min(levelLimit, 6) }, (_, i) => i + 1).map(
-              (level) => (
-                <DropdownMenuItem
-                  key={level}
-                  onClick={() => onExpandToLevel(level)}
+          {/* Collapse all */}
+          <ToolbarButton
+            portalContainer={portalContainer}
+            variant="ghost"
+            size="icon-sm"
+            aria-label="全部折叠"
+            label="全部折叠"
+            onClick={onCollapseAll}
+          >
+            <Minus />
+          </ToolbarButton>
+
+          {/* Expand all */}
+          <ToolbarButton
+            portalContainer={portalContainer}
+            variant="ghost"
+            size="icon-sm"
+            aria-label="全部展开"
+            label="全部展开"
+            onClick={onExpandAll}
+          >
+            <Plus />
+          </ToolbarButton>
+
+          <DropdownMenu modal={mode !== 'floating'} highlightItemOnHover={!fontSizeEditing}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={<Button variant="ghost" size="icon-sm" />}
+                  />
+                }
+                aria-label="目录选项"
+              >
+                <Ellipsis />
+              </TooltipTrigger>
+              <TooltipContent container={portalContainer}>
+                目录选项
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent
+              initialFocus={false}
+              align="end"
+              container={portalContainer}
+              finalFocus={false}
+              className="w-max"
+            >
+              <DropdownMenuGroup>
+                <DropdownMenuCheckboxItem
+                  checked={nonLeafBlankAreaJump}
+                  onCheckedChange={onToggleNonLeafBlankAreaJump}
                 >
-                  Level {level}
-                </DropdownMenuItem>
-              ),
-            )}
-            {validThresholds.length > 0 && (
-              <>
+                  点击空白跳转而非折叠
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={autoHighlightActive}
+                  onCheckedChange={onToggleAutoHighlight}
+                >
+                  高亮当前标题
+                </DropdownMenuCheckboxItem>
+              <Field orientation="horizontal" className="px-1.5 py-1">
+                <FieldLabel
+                  htmlFor={fontSizeId}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const root = event.currentTarget.getRootNode() as Document | ShadowRoot;
+                    const input = root.getElementById(fontSizeId) as HTMLInputElement | null;
+                    if (root.activeElement === input) input?.blur();
+                    else input?.focus({ preventScroll: true });
+                  }}
+                >字号</FieldLabel>
+                <Input
+                  id={fontSizeId}
+                  type="number"
+                  min={10}
+                  max={24}
+                  step={1}
+                  defaultValue={fontSize}
+                  className="w-20"
+                  onFocus={() => setFontSizeEditing(true)}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onChange={(event) => {
+                    const value = event.target.valueAsNumber;
+                    if (Number.isInteger(value) && value >= 10 && value <= 24) {
+                      onChangeFontSize(value);
+                    }
+                  }}
+                  onBlur={(event) => {
+                    setFontSizeEditing(false);
+                    event.target.value = String(fontSize);
+                  }}
+                />
+              </Field>
+                {autoHighlightActive && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>高亮透明度</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent container={portalContainer}>
+                      <DropdownMenuRadioGroup
+                        value={String(highlightOpacity)}
+                        onValueChange={(value) =>
+                          onChangeHighlightOpacity(Number(value))
+                        }
+                      >
+                        <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
+                        {([10, 20, 30, 40, 50] as const).map((op) => (
+                          <DropdownMenuRadioItem key={op} value={String(op)}>
+                            {op}%
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Smart Collapse</DropdownMenuLabel>
-                {validThresholds.map((t) => (
+                <DropdownMenuLabel>展开层级</DropdownMenuLabel>
+                {Array.from(
+                  { length: Math.min(levelLimit, 6) },
+                  (_, i) => i + 1,
+                ).map((level) => (
                   <DropdownMenuItem
-                    key={t}
-                    onClick={() => onSmartCollapse(t)}
+                    key={level}
+                    onClick={() => onExpandToLevel(level)}
                   >
-                    &gt; {t} Items
+                    第 {level} 级
                   </DropdownMenuItem>
                 ))}
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                {validThresholds.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>智能折叠</DropdownMenuLabel>
+                    {validThresholds.map((t) => (
+                      <DropdownMenuItem
+                        key={t}
+                        onClick={() => onSmartCollapse(t)}
+                      >
+                        超过 {t} 项
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* Refresh */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title="刷新目录"
-          onClick={onRefresh}
-        >
-          <RefreshCw
-            className={cn('size-[15px]', isRefreshing && 'animate-spin')}
-          />
-        </Button>
-
-        {/* Close (floating only) */}
-        {mode === 'floating' && onClose && (
-          <Button
+          {/* Refresh */}
+          <ToolbarButton
+            portalContainer={portalContainer}
             variant="ghost"
-            size="icon"
-            title="最小化/关闭"
-            onClick={onClose}
+            size="icon-sm"
+            aria-label="刷新目录"
+            label="刷新目录"
+            disabled={isRefreshing}
+            onClick={onRefresh}
           >
-            <X className="size-4" />
-          </Button>
-        )}
-      </div>
-    </header>
+            <RefreshCw className={cn(isRefreshing && 'animate-spin')} />
+          </ToolbarButton>
+
+          {/* Close (floating only) */}
+          {mode === 'floating' && onClose && (
+            <ToolbarButton
+              portalContainer={portalContainer}
+              variant="ghost"
+              size="icon-sm"
+              aria-label="关闭悬浮面板"
+              label="关闭悬浮面板"
+              onClick={onClose}
+            >
+              <X />
+            </ToolbarButton>
+          )}
+        </div>
+      </header>
+    </TooltipProvider>
+  );
+}
+
+function ToolbarButton({
+  label,
+  portalContainer,
+  children,
+  ...props
+}: ComponentProps<typeof Button> & {
+  label: string;
+  portalContainer?: HTMLElement | null;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Button {...props} />} aria-label={label}>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent container={portalContainer}>{label}</TooltipContent>
+    </Tooltip>
   );
 }

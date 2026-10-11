@@ -67,6 +67,8 @@ export const DEFAULT_FLOATING_POSITION: FloatingPanelPosition = {
 export interface Settings {
   /** 是否自动高亮目录中当前浏览的标题 */
   autoHighlightActive: boolean;
+  /** 目录标题字号（px） */
+  fontSize: number;
   /** 高亮背景色透明度 (%) */
   highlightOpacity: 10 | 20 | 30 | 40 | 50;
   /** 非叶子节点点击空白处时是否跳转到标题 */
@@ -75,6 +77,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   autoHighlightActive: false,
+  fontSize: 13,
   highlightOpacity: 30,
   nonLeafBlankAreaJump: false,
 };

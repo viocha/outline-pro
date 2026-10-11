@@ -1,3 +1,4 @@
+import '@fontsource-variable/geist';
 import {
   useState,
   useRef,
@@ -38,11 +39,7 @@ interface FloatingAppProps {
 }
 
 type ResizeDirection =
-  | 'left'
-  | 'right'
-  | 'bottom'
-  | 'bottom-left'
-  | 'bottom-right';
+  'left' | 'right' | 'bottom' | 'bottom-left' | 'bottom-right';
 
 type HeadingsUpdateMode = 'reset' | 'restore' | 'preserve';
 
@@ -52,9 +49,7 @@ interface RefreshOptions {
 }
 
 function getOutlineHeadingElements(): HTMLElement[] {
-  return Array.from(
-    document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-  ).filter(
+  return Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).filter(
     (el): el is HTMLElement =>
       el instanceof HTMLElement &&
       el.innerText.trim().replaceAll('\n', ' ').length > 0,
@@ -74,7 +69,9 @@ export default function FloatingApp({
   const treeRef = useRef<OutlineTreeRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
   const headingsFpRef = useRef('');
   // Controls how the next headings update treats the user's tree viewport.
   const headingsUpdateModeRef = useRef<HeadingsUpdateMode>('reset');
@@ -96,7 +93,10 @@ export default function FloatingApp({
 
   // Sync settings changes from other panels
   useEffect(() => {
-    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+    const listener = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: string,
+    ) => {
       if (area === 'sync' && changes[SETTINGS_KEY]) {
         const newValue = changes[SETTINGS_KEY].newValue;
         if (newValue) setSettings({ ...DEFAULT_SETTINGS, ...newValue });
@@ -200,12 +200,11 @@ export default function FloatingApp({
 
   // Refresh TOC
   const refreshTOC = useCallback((opts: RefreshOptions = {}) => {
-    const raw = getOutlineHeadingElements()
-      .map((t) => ({
-        tag: t.tagName,
-        text: t.innerText.trim().replaceAll('\n', ' '),
-        id: t.id,
-      }));
+    const raw = getOutlineHeadingElements().map((t) => ({
+      tag: t.tagName,
+      text: t.innerText.trim().replaceAll('\n', ' '),
+      id: t.id,
+    }));
     const normalized = normalizeHeadings(raw);
     const fp = headingsFingerprint(normalized);
     const currentFp = headingsFpRef.current;
@@ -215,8 +214,7 @@ export default function FloatingApp({
     if (opts.preserveView && currentFp === fp) return;
 
     // Skip spinner if called silently and headings haven't changed
-    const unchanged =
-      !!opts.silent && currentFp === fp && currentFp !== '';
+    const unchanged = !!opts.silent && currentFp === fp && currentFp !== '';
 
     if (opts.preserveView) {
       headingsUpdateModeRef.current = 'preserve';
@@ -229,9 +227,9 @@ export default function FloatingApp({
 
     if (!opts.silent && !unchanged) {
       setIsRefreshing(true);
-      setTimeout(() => setIsRefreshing(false), 500);
     }
     setHeadings(normalized);
+    setIsRefreshing(false);
   }, []);
 
   // React keeps the viewport element mounted, but restoring its exact offset
@@ -268,20 +266,22 @@ export default function FloatingApp({
       setIsInitializing(false);
     } else if (updateMode === 'restore') {
       // Panel reopened with unchanged headings → restore saved collapse + scroll
-      Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
-        if (collapse?.fingerprint === fp) {
-          setCollapsedSet(new Set(collapse.collapsed));
-          if (scroll?.fingerprint === fp) {
-            // isInitializing stays true until scroll is applied in the rAF below
-            setPendingScrollTop(scroll.scrollTop);
+      Promise.all([loadCollapseState(), loadScrollState()])
+        .then(([collapse, scroll]) => {
+          if (collapse?.fingerprint === fp) {
+            setCollapsedSet(new Set(collapse.collapsed));
+            if (scroll?.fingerprint === fp) {
+              // isInitializing stays true until scroll is applied in the rAF below
+              setPendingScrollTop(scroll.scrollTop);
+            } else {
+              setIsInitializing(false);
+            }
           } else {
+            if (treeRef.current) treeRef.current.smartCollapse(50);
             setIsInitializing(false);
           }
-        } else {
-          if (treeRef.current) treeRef.current.smartCollapse(50);
-          setIsInitializing(false);
-        }
-      }).catch(() => setIsInitializing(false));
+        })
+        .catch(() => setIsInitializing(false));
     } else {
       // Manual refresh or a genuinely new page → reset to the default state.
       setPendingScrollTop(null);
@@ -395,36 +395,44 @@ export default function FloatingApp({
       if (shouldRefresh) debouncedRefresh();
     });
     if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
     }
     return () => observer.disconnect();
   }, [visible, refreshTOC]);
 
   // Jump to heading
-  const jumpTo = useCallback((index: number) => {
-    if (settings.autoHighlightActive) {
-      setActiveIndex(index);
-    }
-    const el = getOutlineHeadingElements()[index];
-    if (!el) return;
+  const jumpTo = useCallback(
+    (index: number) => {
+      if (settings.autoHighlightActive) {
+        setActiveIndex(index);
+      }
+      const el = getOutlineHeadingElements()[index];
+      if (!el) return;
 
-    if (!settings.autoHighlightActive) {
-      el.scrollIntoView({ behavior: 'instant', block: 'start' });
-      return;
-    }
+      if (!settings.autoHighlightActive) {
+        el.scrollIntoView({ behavior: 'instant', block: 'start' });
+        return;
+      }
 
-    const threshold = window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO;
-    const desiredTop = Math.max(threshold - ACTIVE_HEADING_TOLERANCE_PX, 0);
-    const targetTop = window.scrollY + el.getBoundingClientRect().top - desiredTop;
-    const maxTop = Math.max(
-      document.documentElement.scrollHeight - window.innerHeight,
-      0,
-    );
-    window.scrollTo({
-      top: Math.min(Math.max(targetTop, 0), maxTop),
-      behavior: 'instant',
-    });
-  }, [settings.autoHighlightActive]);
+      const threshold = window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO;
+      const desiredTop = Math.max(threshold - ACTIVE_HEADING_TOLERANCE_PX, 0);
+      const targetTop =
+        window.scrollY + el.getBoundingClientRect().top - desiredTop;
+      const maxTop = Math.max(
+        document.documentElement.scrollHeight - window.innerHeight,
+        0,
+      );
+      window.scrollTo({
+        top: Math.min(Math.max(targetTop, 0), maxTop),
+        behavior: 'instant',
+      });
+    },
+    [settings.autoHighlightActive],
+  );
 
   // Select/highlight heading text
   const selectRange = useCallback((index: number) => {
@@ -453,9 +461,20 @@ export default function FloatingApp({
     });
   }, []);
 
+  const changeFontSize = useCallback((fontSize: number) => {
+    setSettings((prev) => {
+      const next = { ...prev, fontSize };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   const changeHighlightOpacity = useCallback((v: number) => {
     setSettings((prev) => {
-      const next = { ...prev, highlightOpacity: v as Settings['highlightOpacity'] };
+      const next = {
+        ...prev,
+        highlightOpacity: v as Settings['highlightOpacity'],
+      };
       saveSettings(next);
       return next;
     });
@@ -639,8 +658,7 @@ export default function FloatingApp({
         width: position.width,
         height: position.height,
         zIndex: 2147483647,
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: '"Geist Variable", "Segoe UI", sans-serif',
         fontSize: '16px',
         opacity: isInitializing ? 0 : 1,
       }}
@@ -655,6 +673,7 @@ export default function FloatingApp({
           isRefreshing={isRefreshing}
           autoHighlightActive={settings.autoHighlightActive}
           highlightOpacity={settings.highlightOpacity}
+            fontSize={settings.fontSize}
           nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
           portalContainer={portalContainer}
           onDragHandleMouseDown={handleDragStart}
@@ -668,18 +687,21 @@ export default function FloatingApp({
           onSwitchMode={switchToSidebar}
           onToggleAutoHighlight={toggleAutoHighlight}
           onChangeHighlightOpacity={changeHighlightOpacity}
+          onChangeFontSize={changeFontSize}
           onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
           onClose={hidePanel}
         />
 
-        <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
+        <ScrollArea className="min-h-0 flex-1" viewportRef={scrollViewportRef}>
           <OutlineTree
             ref={treeRef}
             headings={headings}
+            portalContainer={portalContainer}
             collapsedSet={collapsedSet}
             onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             highlightOpacity={settings.highlightOpacity}
+            fontSize={settings.fontSize}
             nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
             onJump={jumpTo}
             onHighlight={selectRange}

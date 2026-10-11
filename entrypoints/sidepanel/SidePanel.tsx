@@ -8,6 +8,7 @@ import {
 import OutlineHeader from '@/components/OutlineHeader';
 import OutlineTree, { type OutlineTreeRef } from '@/components/OutlineTree';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import {
   normalizeHeadings,
   type HeadingItem,
@@ -66,7 +67,10 @@ export default function SidePanel() {
 
   // Sync settings changes from other panels
   useEffect(() => {
-    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+    const listener = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: string,
+    ) => {
       if (area === 'sync' && changes[SETTINGS_KEY]) {
         const newValue = changes[SETTINGS_KEY].newValue;
         if (newValue) setSettings({ ...DEFAULT_SETTINGS, ...newValue });
@@ -77,27 +81,30 @@ export default function SidePanel() {
   }, []);
 
   const refreshTOC = useCallback(async (opts: RefreshOptions = {}) => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (
-      !tab?.url ||
-      tab.url.startsWith('chrome://') ||
-      tab.url.startsWith('edge://')
-    ) {
-      setError('当前页面不支持');
-      setHeadings([]);
-      return;
-    }
-    currentTabIdRef.current = tab.id!;
-    setError(null);
-
+    if (!opts.silent) setIsRefreshing(true);
     let willSpin = false;
     try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (
+        !tab?.url ||
+        tab.url.startsWith('chrome://') ||
+        tab.url.startsWith('edge://')
+      ) {
+        setIsRefreshing(false);
+        setError('当前页面不支持');
+        setHeadings([]);
+        return;
+      }
+      currentTabIdRef.current = tab.id!;
+      setError(null);
+
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id! },
         func: () => {
-          return Array.from(
-            document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-          )
+          return Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
             .filter(
               (el): el is HTMLElement =>
                 el instanceof HTMLElement &&
@@ -144,7 +151,7 @@ export default function SidePanel() {
       setError('无法读取页面');
       setHeadings([]);
     } finally {
-      if (willSpin) setTimeout(() => setIsRefreshing(false), 500);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -179,14 +186,17 @@ export default function SidePanel() {
       setPendingScrollTop(null);
     } else if (updateMode === 'restore') {
       // Panel opened with unchanged headings → restore saved collapse + scroll
-      Promise.all([loadCollapseState(), loadScrollState()]).then(([collapse, scroll]) => {
-        if (collapse?.fingerprint === fp) {
-          setCollapsedSet(new Set(collapse.collapsed));
-          if (scroll?.fingerprint === fp) setPendingScrollTop(scroll.scrollTop);
-        } else if (treeRef.current) {
-          treeRef.current.smartCollapse(50);
-        }
-      });
+      Promise.all([loadCollapseState(), loadScrollState()]).then(
+        ([collapse, scroll]) => {
+          if (collapse?.fingerprint === fp) {
+            setCollapsedSet(new Set(collapse.collapsed));
+            if (scroll?.fingerprint === fp)
+              setPendingScrollTop(scroll.scrollTop);
+          } else if (treeRef.current) {
+            treeRef.current.smartCollapse(50);
+          }
+        },
+      );
     } else {
       // Tab navigation or manual refresh starts from the default state.
       setPendingScrollTop(null);
@@ -239,54 +249,58 @@ export default function SidePanel() {
     };
   }, [headings]);
 
-  const jumpTo = useCallback((index: number) => {
-    if (currentTabIdRef.current === null) return;
-    if (settings.autoHighlightActive) {
-      setActiveIndex(index);
-    }
-    chrome.scripting.executeScript({
-      target: { tabId: currentTabIdRef.current },
-      args: [
-        index,
-        settings.autoHighlightActive,
-        ACTIVE_HEADING_VIEWPORT_RATIO,
-        ACTIVE_HEADING_TOLERANCE_PX,
-      ],
-      func: (
-        idx: number,
-        alignToHighlight: boolean,
-        viewportRatio: number,
-        tolerancePx: number,
-      ) => {
-        const els = Array.from(
-          document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-        ).filter(
-          (node): node is HTMLElement =>
-            node instanceof HTMLElement &&
-            node.innerText.trim().replaceAll('\n', ' ').length > 0,
-        );
-        const el = els[idx];
-        if (!el) return;
+  const jumpTo = useCallback(
+    (index: number) => {
+      if (currentTabIdRef.current === null) return;
+      if (settings.autoHighlightActive) {
+        setActiveIndex(index);
+      }
+      chrome.scripting.executeScript({
+        target: { tabId: currentTabIdRef.current },
+        args: [
+          index,
+          settings.autoHighlightActive,
+          ACTIVE_HEADING_VIEWPORT_RATIO,
+          ACTIVE_HEADING_TOLERANCE_PX,
+        ],
+        func: (
+          idx: number,
+          alignToHighlight: boolean,
+          viewportRatio: number,
+          tolerancePx: number,
+        ) => {
+          const els = Array.from(
+            document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+          ).filter(
+            (node): node is HTMLElement =>
+              node instanceof HTMLElement &&
+              node.innerText.trim().replaceAll('\n', ' ').length > 0,
+          );
+          const el = els[idx];
+          if (!el) return;
 
-        if (!alignToHighlight) {
-          el.scrollIntoView({ behavior: 'instant', block: 'start' });
-          return;
-        }
+          if (!alignToHighlight) {
+            el.scrollIntoView({ behavior: 'instant', block: 'start' });
+            return;
+          }
 
-        const threshold = window.innerHeight * viewportRatio;
-        const desiredTop = Math.max(threshold - tolerancePx, 0);
-        const targetTop = window.scrollY + el.getBoundingClientRect().top - desiredTop;
-        const maxTop = Math.max(
-          document.documentElement.scrollHeight - window.innerHeight,
-          0,
-        );
-        window.scrollTo({
-          top: Math.min(Math.max(targetTop, 0), maxTop),
-          behavior: 'instant',
-        });
-      },
-    });
-  }, [settings.autoHighlightActive]);
+          const threshold = window.innerHeight * viewportRatio;
+          const desiredTop = Math.max(threshold - tolerancePx, 0);
+          const targetTop =
+            window.scrollY + el.getBoundingClientRect().top - desiredTop;
+          const maxTop = Math.max(
+            document.documentElement.scrollHeight - window.innerHeight,
+            0,
+          );
+          window.scrollTo({
+            top: Math.min(Math.max(targetTop, 0), maxTop),
+            behavior: 'instant',
+          });
+        },
+      });
+    },
+    [settings.autoHighlightActive],
+  );
 
   const selectRange = useCallback((index: number) => {
     if (currentTabIdRef.current === null) return;
@@ -335,9 +349,20 @@ export default function SidePanel() {
     });
   }, []);
 
+  const changeFontSize = useCallback((fontSize: number) => {
+    setSettings((prev) => {
+      const next = { ...prev, fontSize };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   const changeHighlightOpacity = useCallback((v: number) => {
     setSettings((prev) => {
-      const next = { ...prev, highlightOpacity: v as Settings['highlightOpacity'] };
+      const next = {
+        ...prev,
+        highlightOpacity: v as Settings['highlightOpacity'],
+      };
       saveSettings(next);
       return next;
     });
@@ -378,8 +403,7 @@ export default function SidePanel() {
             );
             if (els.length === 0) return -1;
             // Find the last heading whose top is at or above 20% of viewport
-            const threshold =
-              window.innerHeight * viewportRatio + tolerancePx;
+            const threshold = window.innerHeight * viewportRatio + tolerancePx;
             let active = 0;
             for (let i = 0; i < els.length; i++) {
               const rect = els[i].getBoundingClientRect();
@@ -454,20 +478,26 @@ export default function SidePanel() {
         isRefreshing={isRefreshing}
         autoHighlightActive={settings.autoHighlightActive}
         highlightOpacity={settings.highlightOpacity}
+            fontSize={settings.fontSize}
         nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
         onRefresh={refreshTOC}
         onCollapseAll={() => treeRef.current?.collapseAll()}
         onExpandAll={() => treeRef.current?.expandAll()}
         onExpandToLevel={(level) => treeRef.current?.expandToLevel(level)}
-        onSmartCollapse={(threshold) => treeRef.current?.smartCollapse(threshold)}
+        onSmartCollapse={(threshold) =>
+          treeRef.current?.smartCollapse(threshold)
+        }
         onSwitchMode={switchToFloating}
         onToggleAutoHighlight={toggleAutoHighlight}
         onChangeHighlightOpacity={changeHighlightOpacity}
+          onChangeFontSize={changeFontSize}
         onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
       />
-      <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
+      <ScrollArea className="min-h-0 flex-1" viewportRef={scrollViewportRef}>
         {error ? (
-          <p className="py-4 text-center text-[13px] text-text-dim">{error}</p>
+          <Empty className="h-full">
+            <EmptyDescription>{error}</EmptyDescription>
+          </Empty>
         ) : (
           <OutlineTree
             ref={treeRef}
@@ -476,6 +506,7 @@ export default function SidePanel() {
             onCollapsedSetChange={setCollapsedSet}
             activeIndex={settings.autoHighlightActive ? activeIndex : undefined}
             highlightOpacity={settings.highlightOpacity}
+            fontSize={settings.fontSize}
             nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
             onJump={jumpTo}
             onHighlight={selectRange}

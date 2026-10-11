@@ -1,72 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
-/*
- * Shadow DOM host reset
- * Prevents external page styles from leaking into the floating panel.
- * :host only applies inside Shadow DOM, so the sidepanel is unaffected.
- */
-:host {
-  all: initial;
-  display: block;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--foreground);
-  background-color: var(--background);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@custom-variant dark (&:is(.dark *));
 
-:root,
-:host  {
-  --background: #ffffff;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #2563eb;
-  --primary-strong: #2048b9;
-  --primary-foreground: #f8fafc;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #6b7280;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
-  --destructive: #dc2626;
-  --destructive-foreground: #fef2f2;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #93c5fd;
-  --text-dim: #9ca3af;
-}
-
-@theme {
-  --spacing: 4px;
-
-  --radius-xs: 2px;
-  --radius-sm: 2px;
-  --radius: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-3xl: 24px;
-  --radius-4xl: 32px;
-
-  --text-xs: 12px;
-  --text-xs--line-height: 16px;
-  --text-sm: 14px;
-  --text-sm--line-height: 20px;
-  --text-base: 16px;
-  --text-base--line-height: 24px;
-  --text-lg: 18px;
-  --text-lg--line-height: 28px;
-  --text-xl: 20px;
-  --text-xl--line-height: 28px;
-
+@theme inline {
+  --font-sans: 'Geist Variable', 'Segoe UI', sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -74,7 +13,6 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
-  --color-primary-strong: var(--primary-strong);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -82,20 +20,81 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-
-  /* Backwards-compatible aliases for the existing app code */
-  --color-bg-hover: var(--accent);
-  --color-text: var(--foreground);
-  --color-text-muted: var(--muted-foreground);
-  --color-text-dim: var(--text-dim);
+  --color-destructive: var(--destructive);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-body {
-  background-color: var(--background);
+:root,
+:host {
+  --radius: 10px;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    margin: 0;
+    font-family: var(--font-sans);
+  }
+  button,
+  [role='button'],
+  [role='menuitem'],
+  a[href],
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* 悬浮面板的样式独立于宿主页面。 */
+:host {
+  all: initial;
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--foreground);
+  color-scheme: light;
+}
+
+/* Shadow DOM 使用固定单位，避免宿主页面根字号改变控件尺寸。 */
+@theme {
+  --spacing: 4px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
 }
