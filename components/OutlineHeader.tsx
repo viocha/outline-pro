@@ -200,14 +200,6 @@ export default function OutlineHeader({
               <Field orientation="horizontal" className="px-1.5 py-1">
                 <FieldLabel
                   htmlFor={fontSizeId}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    const root = event.currentTarget.getRootNode() as Document | ShadowRoot;
-                    const input = root.getElementById(fontSizeId) as HTMLInputElement | null;
-                    if (root.activeElement === input) input?.blur();
-                    else input?.focus({ preventScroll: true });
-                  }}
                 >字号</FieldLabel>
                 <Input
                   id={fontSizeId}
