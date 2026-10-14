@@ -5,12 +5,12 @@ import sharp from 'sharp';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const sourcePath = path.join(rootDir, 'assets', 'icon', 'outline-pro.svg');
+const sourcePath = path.join(rootDir, 'assets', 'icon', 'outline-pro.png');
 const outputDir = path.join(rootDir, 'public', 'icon');
 const sizes = [16, 32, 48, 128];
 
 async function buildIcons() {
-  const svg = await readFile(sourcePath);
+  const image = await readFile(sourcePath);
 
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
@@ -18,7 +18,7 @@ async function buildIcons() {
   for (const size of sizes) {
     const outputPath = path.join(outputDir, `${size}.png`);
 
-    await sharp(svg, { density: size * 8 })
+    await sharp(image)
       .resize(size, size)
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toFile(outputPath);
