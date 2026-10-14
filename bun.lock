@@ -24,7 +24,7 @@
         "@types/react": "^19.2.13",
         "@types/react-dom": "^19.2.3",
         "@wxt-dev/module-react": "^1.1.5",
-        "reload-extension": "^0.3.2",
+        "reload-extension": "^0.3.3",
         "sharp": "^0.34.5",
         "typescript": "^7.0.2",
         "wxt": "^0.20.14",
@@ -1101,7 +1101,7 @@
 
     "registry-url": ["registry-url@6.0.1", "", { "dependencies": { "rc": "1.2.8" } }, "sha512-+crtS5QjFRqFCoQmvGduwYWEBng99ZvmFvF+cUJkGYF1L1BfU8C6Zp9T7f5vPAwyLkUExpvK+ANVZmGU49qi4Q=="],
 
-    "reload-extension": ["reload-extension@0.3.2", "", { "dependencies": { "commander": "^15.0.0", "playwright-core": "^1.64.0" }, "os": "win32", "bin": { "reload-extension": "dist/cli.js" } }, "sha512-cSCur2Nr3Ts6atbwPcJxAPuJaGuBkbKDnT8V/0i0/qaxHX708CGb+Xaf9HdcHCQ81hCMR2ax7VbFxpmFld970Q=="],
+    "reload-extension": ["reload-extension@0.3.3", "", { "dependencies": { "commander": "^15.0.0", "playwright-core": "^1.64.0" }, "os": "win32", "bin": { "reload-extension": "dist/cli.js" } }, "sha512-NLiytYguyyAdy7vZTnfCDN5DGfoSLU0FlnRWGVRN30Ogi0EDfO1k7uOqxuFH/r1Dbc2pieQ7NeZeuxYbOK//Bg=="],
 
     "require-directory": ["require-directory@2.1.1", "", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 
