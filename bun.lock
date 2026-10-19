@@ -24,7 +24,7 @@
         "@types/react": "^19.2.13",
         "@types/react-dom": "^19.2.3",
         "@wxt-dev/module-react": "^1.1.5",
-        "reload-extension": "^0.3.3",
+        "reload-extension": "^0.3.4",
         "sharp": "^0.34.5",
         "typescript": "^7.0.2",
         "wxt": "^0.20.14",
@@ -1043,7 +1043,7 @@
 
     "pkg-up": ["pkg-up@3.1.0", "", { "dependencies": { "find-up": "^3.0.0" } }, "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="],
 
-    "playwright-core": ["playwright-core@1.64.0", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg=="],
+    "playwright-core": ["playwright-core@1.64.1", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ=="],
 
     "postcss": ["postcss@8.5.29", "", { "dependencies": { "nanoid": "^3.3.19", "picocolors": "^1.1.1", "source-map-js": "^1.2.2" } }, "sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ=="],
 
@@ -1101,7 +1101,7 @@
 
     "registry-url": ["registry-url@6.0.1", "", { "dependencies": { "rc": "1.2.8" } }, "sha512-+crtS5QjFRqFCoQmvGduwYWEBng99ZvmFvF+cUJkGYF1L1BfU8C6Zp9T7f5vPAwyLkUExpvK+ANVZmGU49qi4Q=="],
 
-    "reload-extension": ["reload-extension@0.3.3", "", { "dependencies": { "commander": "^15.0.0", "playwright-core": "^1.64.0" }, "os": "win32", "bin": { "reload-extension": "dist/cli.js" } }, "sha512-NLiytYguyyAdy7vZTnfCDN5DGfoSLU0FlnRWGVRN30Ogi0EDfO1k7uOqxuFH/r1Dbc2pieQ7NeZeuxYbOK//Bg=="],
+    "reload-extension": ["reload-extension@0.3.4", "", { "dependencies": { "commander": "^15.0.0", "playwright-core": "^1.64.0" }, "os": "win32", "bin": { "reload-extension": "dist/cli.js" } }, "sha512-Ag9AF/kh8KAwLAzBJT5La66qd/zaHQsjoGnRBUXKV/oJpP5qfujgtuxPv3nOS+Wqwf0N1JSai9PeRbwc/35mcQ=="],
 
     "require-directory": ["require-directory@2.1.1", "", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 
