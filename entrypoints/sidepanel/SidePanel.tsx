@@ -406,7 +406,7 @@ export default function SidePanel() {
             const threshold = window.innerHeight * viewportRatio + tolerancePx;
             let active = 0;
             for (let i = 0; i < els.length; i++) {
-              const rect = els[i].getBoundingClientRect();
+              const rect = els[i]!.getBoundingClientRect();
               if (rect.top <= threshold) {
                 active = i;
               } else {

@@ -20,11 +20,11 @@ export function buildTree(headings: HeadingItem[]): TreeNode[] {
 
   headings.forEach((h, index) => {
     const level = h.level;
-    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+    while (stack.length > 1 && stack[stack.length - 1]!.level >= level) {
       stack.pop();
     }
     const node: TreeNode = { heading: h, index, children: [] };
-    stack[stack.length - 1].nodes.push(node);
+    stack[stack.length - 1]!.nodes.push(node);
     stack.push({ nodes: node.children, level });
   });
 

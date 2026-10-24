@@ -506,7 +506,7 @@ export default function FloatingApp({
         ACTIVE_HEADING_TOLERANCE_PX;
       let active = 0;
       for (let i = 0; i < els.length; i++) {
-        const rect = els[i].getBoundingClientRect();
+        const rect = els[i]!.getBoundingClientRect();
         if (rect.top <= threshold) {
           active = i;
         } else {

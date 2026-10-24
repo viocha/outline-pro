@@ -274,7 +274,7 @@ const OutlineTree = forwardRef<OutlineTreeRef, OutlineTreeProps>(
       (threshold: number) => {
         const level1Nodes = tree.filter((n) => n.heading.level === 1);
         const isSingleLevel1 = level1Nodes.length === 1;
-        const singleLevel1Index = isSingleLevel1 ? level1Nodes[0].index : -1;
+        const singleLevel1Index = isSingleLevel1 ? level1Nodes[0]!.index : -1;
 
         const newCollapsed = new Set<number>();
         const walk = (nodes: TreeNode[]) => {
