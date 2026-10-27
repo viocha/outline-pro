@@ -15,7 +15,6 @@ import {
   type Settings,
   DEFAULT_SETTINGS,
   loadSettings,
-  saveSettings,
   SETTINGS_KEY,
   headingsFingerprint,
   loadCollapseState,
@@ -340,45 +339,6 @@ export default function SidePanel() {
     }
   }, []);
 
-  const toggleAutoHighlight = useCallback(() => {
-    setSettings((prev) => {
-      const next = { ...prev, autoHighlightActive: !prev.autoHighlightActive };
-      saveSettings(next);
-      if (!next.autoHighlightActive) setActiveIndex(-1);
-      return next;
-    });
-  }, []);
-
-  const changeFontSize = useCallback((fontSize: number) => {
-    setSettings((prev) => {
-      const next = { ...prev, fontSize };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
-  const changeHighlightOpacity = useCallback((v: number) => {
-    setSettings((prev) => {
-      const next = {
-        ...prev,
-        highlightOpacity: v as Settings['highlightOpacity'],
-      };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
-  const toggleNonLeafBlankAreaJump = useCallback(() => {
-    setSettings((prev) => {
-      const next = {
-        ...prev,
-        nonLeafBlankAreaJump: !prev.nonLeafBlankAreaJump,
-      };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
   // Detect which heading is currently in view (sidepanel runs in extension context)
   useEffect(() => {
     if (!settings.autoHighlightActive || currentTabIdRef.current === null) {
@@ -475,11 +435,8 @@ export default function SidePanel() {
       <OutlineHeader
         mode="sidepanel"
         headings={headings}
+        settings={settings}
         isRefreshing={isRefreshing}
-        autoHighlightActive={settings.autoHighlightActive}
-        highlightOpacity={settings.highlightOpacity}
-            fontSize={settings.fontSize}
-        nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
         onRefresh={refreshTOC}
         onCollapseAll={() => treeRef.current?.collapseAll()}
         onExpandAll={() => treeRef.current?.expandAll()}
@@ -488,10 +445,6 @@ export default function SidePanel() {
           treeRef.current?.smartCollapse(threshold)
         }
         onSwitchMode={switchToFloating}
-        onToggleAutoHighlight={toggleAutoHighlight}
-        onChangeHighlightOpacity={changeHighlightOpacity}
-          onChangeFontSize={changeFontSize}
-        onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
       />
       <ScrollArea className="min-h-0 flex-1" viewportRef={scrollViewportRef}>
         {error ? (

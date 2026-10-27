@@ -18,7 +18,6 @@ import {
   DEFAULT_FLOATING_POSITION,
   DEFAULT_SETTINGS,
   loadSettings,
-  saveSettings,
   SETTINGS_KEY,
   headingsFingerprint,
   loadCollapseState,
@@ -452,46 +451,6 @@ export default function FloatingApp({
     chrome.runtime.sendMessage({ action: 'OPEN_SIDEPANEL' });
   }, [hidePanel]);
 
-  const toggleAutoHighlight = useCallback(() => {
-    setSettings((prev) => {
-      const next = { ...prev, autoHighlightActive: !prev.autoHighlightActive };
-      saveSettings(next);
-      if (!next.autoHighlightActive) setActiveIndex(-1);
-      return next;
-    });
-  }, []);
-
-  const changeFontSize = useCallback((fontSize: number) => {
-    setSettings((prev) => {
-      const next = { ...prev, fontSize };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
-  const changeHighlightOpacity = useCallback((v: number) => {
-    setSettings((prev) => {
-      const next = {
-        ...prev,
-        highlightOpacity: v as Settings['highlightOpacity'],
-      };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
-  const toggleNonLeafBlankAreaJump = useCallback(() => {
-    setSettings((prev) => {
-      const next = {
-        ...prev,
-        nonLeafBlankAreaJump: !prev.nonLeafBlankAreaJump,
-      };
-      saveSettings(next);
-      return next;
-    });
-  }, []);
-
-  // Detect which heading is currently in view using scroll polling (floating runs in page context)
   useEffect(() => {
     if (!settings.autoHighlightActive || !visible) {
       setActiveIndex(-1);
@@ -670,11 +629,8 @@ export default function FloatingApp({
         <OutlineHeader
           mode="floating"
           headings={headings}
+          settings={settings}
           isRefreshing={isRefreshing}
-          autoHighlightActive={settings.autoHighlightActive}
-          highlightOpacity={settings.highlightOpacity}
-            fontSize={settings.fontSize}
-          nonLeafBlankAreaJump={settings.nonLeafBlankAreaJump}
           portalContainer={portalContainer}
           onDragHandleMouseDown={handleDragStart}
           onRefresh={refreshTOC}
@@ -685,10 +641,6 @@ export default function FloatingApp({
             treeRef.current?.smartCollapse(threshold)
           }
           onSwitchMode={switchToSidebar}
-          onToggleAutoHighlight={toggleAutoHighlight}
-          onChangeHighlightOpacity={changeHighlightOpacity}
-          onChangeFontSize={changeFontSize}
-          onToggleNonLeafBlankAreaJump={toggleNonLeafBlankAreaJump}
           onClose={hidePanel}
         />
 

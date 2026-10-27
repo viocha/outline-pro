@@ -53,7 +53,13 @@ export default defineBackground(() => {
 
   // Message Handling - primary router
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.action === 'SWITCH_TO_FLOATING') {
+    if (msg.action === 'OPEN_OPTIONS') {
+      chrome.runtime.openOptionsPage().then(
+        () => sendResponse({ ok: true }),
+        () => sendResponse({ ok: false }),
+      );
+      return true;
+    } else if (msg.action === 'SWITCH_TO_FLOATING') {
       const tabId = msg.tabId;
       if (tabId) {
         toggleFloatingPanel(tabId, 'SHOW_FLOATING_PANEL');

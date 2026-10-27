@@ -1,12 +1,4 @@
-import { useId, useState, type ComponentProps } from 'react';
-import { Input } from '@/components/ui/input';
-import { Field, FieldLabel } from '@/components/ui/field';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
+import { useRef, useState, type ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,13 +7,13 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuGroup,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
   DropdownMenuSub,
-  DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import {
   Minus,
@@ -33,17 +25,13 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type HeadingItem, buildTree, type TreeNode } from '@/lib/types';
+import { type HeadingItem, buildTree, type TreeNode, type Settings, updateSettings } from '@/lib/types';
 
 interface OutlineHeaderProps {
   mode: 'sidepanel' | 'floating';
   headings: HeadingItem[];
+  settings: Settings;
   isRefreshing: boolean;
-  autoHighlightActive: boolean;
-  highlightOpacity: number;
-  fontSize: number;
-  onChangeFontSize: (value: number) => void;
-  nonLeafBlankAreaJump: boolean;
   portalContainer?: HTMLElement | null;
   onDragHandleMouseDown?: (e: React.MouseEvent) => void;
   onRefresh: () => void;
@@ -52,21 +40,14 @@ interface OutlineHeaderProps {
   onExpandToLevel: (level: number) => void;
   onSmartCollapse: (threshold: number) => void;
   onSwitchMode: () => void;
-  onToggleAutoHighlight: () => void;
-  onChangeHighlightOpacity: (v: number) => void;
-  onToggleNonLeafBlankAreaJump: () => void;
   onClose?: () => void;
 }
 
 export default function OutlineHeader({
   mode,
   headings,
+  settings,
   isRefreshing,
-  autoHighlightActive,
-  highlightOpacity,
-  fontSize,
-  onChangeFontSize,
-  nonLeafBlankAreaJump,
   portalContainer,
   onDragHandleMouseDown,
   onRefresh,
@@ -75,13 +56,24 @@ export default function OutlineHeader({
   onExpandToLevel,
   onSmartCollapse,
   onSwitchMode,
-  onToggleAutoHighlight,
-  onChangeHighlightOpacity,
-  onToggleNonLeafBlankAreaJump,
   onClose,
 }: OutlineHeaderProps) {
-  const fontSizeId = useId();
-  const [fontSizeEditing, setFontSizeEditing] = useState(false);
+  const savingSettingRef = useRef(false);
+  const [opacityMenuOpen, setOpacityMenuOpen] = useState(false);
+  const [opacityMenuVisible, setOpacityMenuVisible] = useState(false);
+
+  async function changeSetting(patch: Partial<Settings>) {
+    if (savingSettingRef.current) return;
+    savingSettingRef.current = true;
+    try {
+      await updateSettings(patch);
+    } catch (error) {
+      console.error('保存目录设置失败', error);
+    } finally {
+      savingSettingRef.current = false;
+    }
+  }
+
   let maxLevel = 0;
   headings.forEach((h) => {
     if (h.level > maxLevel) maxLevel = h.level;
@@ -105,7 +97,6 @@ export default function OutlineHeader({
   const validThresholds = allThresholds.filter((t) => maxChildren > t);
 
   return (
-    <TooltipProvider delay={500} timeout={0}>
       <header
         className={cn(
           'flex h-9 shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 box-border select-none backdrop-blur supports-[backdrop-filter]:bg-background/85',
@@ -125,7 +116,6 @@ export default function OutlineHeader({
         <div className="flex shrink-0 items-center gap-0.5">
           {/* Switch mode button */}
           <ToolbarButton
-            portalContainer={portalContainer}
             variant="ghost"
             size="icon-sm"
             aria-label={
@@ -139,7 +129,6 @@ export default function OutlineHeader({
 
           {/* Collapse all */}
           <ToolbarButton
-            portalContainer={portalContainer}
             variant="ghost"
             size="icon-sm"
             aria-label="全部折叠"
@@ -151,7 +140,6 @@ export default function OutlineHeader({
 
           {/* Expand all */}
           <ToolbarButton
-            portalContainer={portalContainer}
             variant="ghost"
             size="icon-sm"
             aria-label="全部展开"
@@ -161,22 +149,14 @@ export default function OutlineHeader({
             <Plus />
           </ToolbarButton>
 
-          <DropdownMenu modal={mode !== 'floating'} highlightItemOnHover={!fontSizeEditing}>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <DropdownMenuTrigger
-                    render={<Button variant="ghost" size="icon-sm" />}
-                  />
-                }
-                aria-label="目录选项"
-              >
-                <Ellipsis />
-              </TooltipTrigger>
-              <TooltipContent container={portalContainer}>
-                目录选项
-              </TooltipContent>
-            </Tooltip>
+          <DropdownMenu modal={mode !== 'floating'}>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon-sm" />}
+              aria-label="更多选项"
+              title="更多选项"
+            >
+              <Ellipsis />
+            </DropdownMenuTrigger>
             <DropdownMenuContent
               initialFocus={false}
               align="end"
@@ -186,64 +166,43 @@ export default function OutlineHeader({
             >
               <DropdownMenuGroup>
                 <DropdownMenuCheckboxItem
-                  checked={nonLeafBlankAreaJump}
-                  onCheckedChange={onToggleNonLeafBlankAreaJump}
+                  checked={settings.nonLeafBlankAreaJump}
+                  onCheckedChange={checked => void changeSetting({ nonLeafBlankAreaJump: checked })}
                 >
-                  点击空白跳转而非折叠
+                  点击空白跳转
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
-                  checked={autoHighlightActive}
-                  onCheckedChange={onToggleAutoHighlight}
+                  checked={settings.autoHighlightActive}
+                  onCheckedChange={checked => void changeSetting({ autoHighlightActive: checked })}
                 >
                   高亮当前标题
                 </DropdownMenuCheckboxItem>
-              <Field orientation="horizontal" className="px-1.5 py-1">
-                <FieldLabel
-                  htmlFor={fontSizeId}
-                >字号</FieldLabel>
-                <Input
-                  id={fontSizeId}
-                  type="number"
-                  min={10}
-                  max={24}
-                  step={1}
-                  defaultValue={fontSize}
-                  className="w-20"
-                  onFocus={() => setFontSizeEditing(true)}
-                  onKeyDown={(event) => event.stopPropagation()}
-                  onChange={(event) => {
-                    const value = event.target.valueAsNumber;
-                    if (Number.isInteger(value) && value >= 10 && value <= 24) {
-                      onChangeFontSize(value);
-                    }
+                <DropdownMenuSub
+                  open={opacityMenuOpen}
+                  onOpenChange={open => {
+                    setOpacityMenuOpen(open);
+                    if (open) setOpacityMenuVisible(true);
                   }}
-                  onBlur={(event) => {
-                    setFontSizeEditing(false);
-                    event.target.value = String(fontSize);
+                  onOpenChangeComplete={open => {
+                    if (!open) setOpacityMenuVisible(false);
                   }}
-                />
-              </Field>
-                {autoHighlightActive && (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>高亮透明度</DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent container={portalContainer}>
-                      <DropdownMenuRadioGroup
-                        value={String(highlightOpacity)}
-                        onValueChange={(value) =>
-                          onChangeHighlightOpacity(Number(value))
-                        }
-                      >
-                        <DropdownMenuLabel>高亮透明度</DropdownMenuLabel>
-                        {([10, 20, 30, 40, 50] as const).map((op) => (
-                          <DropdownMenuRadioItem key={op} value={String(op)}>
-                            {op}%
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                )}
-
+                >
+                  <DropdownMenuSubTrigger className={cn(opacityMenuVisible && 'bg-accent text-accent-foreground')}>
+                    高亮透明度
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent container={portalContainer} finalFocus={interactionType => interactionType === 'keyboard'}>
+                    <DropdownMenuRadioGroup
+                      value={String(settings.highlightOpacity)}
+                      onValueChange={value => void changeSetting({ highlightOpacity: Number(value) as Settings['highlightOpacity'] })}
+                    >
+                      {([10, 20, 30, 40, 50] as const).map(opacity => (
+                        <DropdownMenuRadioItem key={opacity} value={String(opacity)} closeOnClick={false} onClick={() => setOpacityMenuOpen(false)}>
+                          {opacity}%
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>展开层级</DropdownMenuLabel>
                 {Array.from(
@@ -271,13 +230,18 @@ export default function OutlineHeader({
                     ))}
                   </>
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  void chrome.runtime.sendMessage({ action: 'OPEN_OPTIONS' }).catch(console.error);
+                }}>
+                  设置
+                </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Refresh */}
           <ToolbarButton
-            portalContainer={portalContainer}
             variant="ghost"
             size="icon-sm"
             aria-label="刷新目录"
@@ -291,8 +255,7 @@ export default function OutlineHeader({
           {/* Close (floating only) */}
           {mode === 'floating' && onClose && (
             <ToolbarButton
-              portalContainer={portalContainer}
-              variant="ghost"
+                variant="ghost"
               size="icon-sm"
               aria-label="关闭悬浮面板"
               label="关闭悬浮面板"
@@ -303,25 +266,19 @@ export default function OutlineHeader({
           )}
         </div>
       </header>
-    </TooltipProvider>
   );
 }
 
 function ToolbarButton({
   label,
-  portalContainer,
   children,
   ...props
 }: ComponentProps<typeof Button> & {
   label: string;
-  portalContainer?: HTMLElement | null;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger render={<Button {...props} />} aria-label={label}>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent container={portalContainer}>{label}</TooltipContent>
-    </Tooltip>
+    <Button {...props} aria-label={label} title={label}>
+      {children}
+    </Button>
   );
 }
