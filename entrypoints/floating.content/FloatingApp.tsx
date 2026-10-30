@@ -62,6 +62,8 @@ export default function FloatingApp({
   const [visible, setVisible] = useState(false);
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshFrameRef = useRef<number | null>(null);
+  const manualRefreshPendingRef = useRef(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [collapsedSet, setCollapsedSet] = useState<Set<number>>(new Set());
@@ -224,11 +226,32 @@ export default function FloatingApp({
       preservedScrollTopRef.current = null;
     }
 
-    if (!opts.silent && !unchanged) {
-      setIsRefreshing(true);
-    }
     setHeadings(normalized);
-    setIsRefreshing(false);
+  }, []);
+
+  const refreshManually = useCallback(() => {
+    if (manualRefreshPendingRef.current) return;
+    manualRefreshPendingRef.current = true;
+    setIsRefreshing(true);
+
+    // 先绘制旋转状态，再在下一帧读取页面；不设置动画最短时长。
+    refreshFrameRef.current = requestAnimationFrame(() => {
+      refreshFrameRef.current = requestAnimationFrame(() => {
+        refreshFrameRef.current = null;
+        try {
+          refreshTOC();
+        } catch (error) {
+          console.error('刷新大纲失败', error);
+        } finally {
+          manualRefreshPendingRef.current = false;
+          setIsRefreshing(false);
+        }
+      });
+    });
+  }, [refreshTOC]);
+
+  useEffect(() => () => {
+    if (refreshFrameRef.current !== null) cancelAnimationFrame(refreshFrameRef.current);
   }, []);
 
   // React keeps the viewport element mounted, but restoring its exact offset
@@ -633,7 +656,7 @@ export default function FloatingApp({
           isRefreshing={isRefreshing}
           portalContainer={portalContainer}
           onDragHandleMouseDown={handleDragStart}
-          onRefresh={refreshTOC}
+          onRefresh={refreshManually}
           onCollapseAll={() => treeRef.current?.collapseAll()}
           onExpandAll={() => treeRef.current?.expandAll()}
           onExpandToLevel={(level) => treeRef.current?.expandToLevel(level)}

@@ -100,7 +100,7 @@ export default function OutlineHeader({
       <header
         className={cn(
           'flex h-9 shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 box-border select-none backdrop-blur supports-[backdrop-filter]:bg-background/85',
-          mode === 'floating' && 'cursor-move select-none pr-2',
+          mode === 'floating' && 'pr-2',
         )}
       >
         <div
@@ -113,7 +113,7 @@ export default function OutlineHeader({
           Outline
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 cursor-default items-center">
           {/* Switch mode button */}
           <ToolbarButton
             variant="ghost"
@@ -244,8 +244,8 @@ export default function OutlineHeader({
           <ToolbarButton
             variant="ghost"
             size="icon-sm"
-            aria-label="刷新目录"
-            label="刷新目录"
+            aria-label="刷新大纲"
+            label="刷新大纲"
             disabled={isRefreshing}
             onClick={onRefresh}
           >
@@ -272,12 +272,18 @@ export default function OutlineHeader({
 function ToolbarButton({
   label,
   children,
+  className,
   ...props
 }: ComponentProps<typeof Button> & {
   label: string;
 }) {
   return (
-    <Button {...props} aria-label={label} title={label}>
+    <Button
+      {...props}
+      className={cn('cursor-pointer disabled:pointer-events-auto disabled:opacity-100', className)}
+      aria-label={label}
+      title={label}
+    >
       {children}
     </Button>
   );
