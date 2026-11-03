@@ -1,3 +1,4 @@
+import { getScrollPositionRatio, jumpToHeading } from '@/lib/navigation';
 import {
   useState,
   useRef,
@@ -23,7 +24,6 @@ import {
   saveScrollState,
 } from '@/lib/types';
 
-const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
 const ACTIVE_HEADING_TOLERANCE_PX = 12;
 
 type HeadingsUpdateMode = 'reset' | 'restore' | 'preserve';
@@ -251,54 +251,14 @@ export default function SidePanel() {
   const jumpTo = useCallback(
     (index: number) => {
       if (currentTabIdRef.current === null) return;
-      if (settings.autoHighlightActive) {
-        setActiveIndex(index);
-      }
-      chrome.scripting.executeScript({
+      if (settings.autoHighlightActive) setActiveIndex(index);
+      void chrome.scripting.executeScript({
         target: { tabId: currentTabIdRef.current },
-        args: [
-          index,
-          settings.autoHighlightActive,
-          ACTIVE_HEADING_VIEWPORT_RATIO,
-          ACTIVE_HEADING_TOLERANCE_PX,
-        ],
-        func: (
-          idx: number,
-          alignToHighlight: boolean,
-          viewportRatio: number,
-          tolerancePx: number,
-        ) => {
-          const els = Array.from(
-            document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
-          ).filter(
-            (node): node is HTMLElement =>
-              node instanceof HTMLElement &&
-              node.innerText.trim().replaceAll('\n', ' ').length > 0,
-          );
-          const el = els[idx];
-          if (!el) return;
-
-          if (!alignToHighlight) {
-            el.scrollIntoView({ behavior: 'instant', block: 'start' });
-            return;
-          }
-
-          const threshold = window.innerHeight * viewportRatio;
-          const desiredTop = Math.max(threshold - tolerancePx, 0);
-          const targetTop =
-            window.scrollY + el.getBoundingClientRect().top - desiredTop;
-          const maxTop = Math.max(
-            document.documentElement.scrollHeight - window.innerHeight,
-            0,
-          );
-          window.scrollTo({
-            top: Math.min(Math.max(targetTop, 0), maxTop),
-            behavior: 'instant',
-          });
-        },
+        args: [index, getScrollPositionRatio(settings.scrollPosition)],
+        func: jumpToHeading,
       });
     },
-    [settings.autoHighlightActive],
+    [settings.autoHighlightActive, settings.scrollPosition],
   );
 
   const selectRange = useCallback((index: number) => {
@@ -352,7 +312,7 @@ export default function SidePanel() {
       chrome.scripting
         .executeScript({
           target: { tabId: currentTabIdRef.current },
-          args: [ACTIVE_HEADING_VIEWPORT_RATIO, ACTIVE_HEADING_TOLERANCE_PX],
+          args: [getScrollPositionRatio(settings.scrollPosition), ACTIVE_HEADING_TOLERANCE_PX],
           func: (viewportRatio: number, tolerancePx: number) => {
             const els = Array.from(
               document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
@@ -362,7 +322,7 @@ export default function SidePanel() {
                 node.innerText.trim().replaceAll('\n', ' ').length > 0,
             );
             if (els.length === 0) return -1;
-            // Find the last heading whose top is at or above 20% of viewport
+            // 按跳转位置识别当前阅读的标题。
             const threshold = window.innerHeight * viewportRatio + tolerancePx;
             let active = 0;
             for (let i = 0; i < els.length; i++) {
@@ -388,7 +348,7 @@ export default function SidePanel() {
 
     pollActive();
     return () => clearTimeout(rafId);
-  }, [settings.autoHighlightActive, headings]);
+  }, [settings.autoHighlightActive, settings.scrollPosition, headings]);
 
   // Initial load and event listeners
   useEffect(() => {

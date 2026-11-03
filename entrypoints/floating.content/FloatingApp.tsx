@@ -1,3 +1,4 @@
+import { getScrollPositionRatio, jumpToHeading } from '@/lib/navigation';
 import '@fontsource-variable/geist';
 import {
   useState,
@@ -27,7 +28,6 @@ import {
 } from '@/lib/types';
 import '@/assets/main.css';
 
-const ACTIVE_HEADING_VIEWPORT_RATIO = 0.2;
 const ACTIVE_HEADING_TOLERANCE_PX = 12;
 
 interface FloatingAppProps {
@@ -429,31 +429,10 @@ export default function FloatingApp({
   // Jump to heading
   const jumpTo = useCallback(
     (index: number) => {
-      if (settings.autoHighlightActive) {
-        setActiveIndex(index);
-      }
-      const el = getOutlineHeadingElements()[index];
-      if (!el) return;
-
-      if (!settings.autoHighlightActive) {
-        el.scrollIntoView({ behavior: 'instant', block: 'start' });
-        return;
-      }
-
-      const threshold = window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO;
-      const desiredTop = Math.max(threshold - ACTIVE_HEADING_TOLERANCE_PX, 0);
-      const targetTop =
-        window.scrollY + el.getBoundingClientRect().top - desiredTop;
-      const maxTop = Math.max(
-        document.documentElement.scrollHeight - window.innerHeight,
-        0,
-      );
-      window.scrollTo({
-        top: Math.min(Math.max(targetTop, 0), maxTop),
-        behavior: 'instant',
-      });
+      if (settings.autoHighlightActive) setActiveIndex(index);
+      jumpToHeading(index, getScrollPositionRatio(settings.scrollPosition));
     },
-    [settings.autoHighlightActive],
+    [settings.autoHighlightActive, settings.scrollPosition],
   );
 
   // Select/highlight heading text
@@ -484,7 +463,7 @@ export default function FloatingApp({
       const els = getOutlineHeadingElements();
       if (els.length === 0) return -1;
       const threshold =
-        window.innerHeight * ACTIVE_HEADING_VIEWPORT_RATIO +
+        window.innerHeight * (getScrollPositionRatio(settings.scrollPosition)) +
         ACTIVE_HEADING_TOLERANCE_PX;
       let active = 0;
       for (let i = 0; i < els.length; i++) {
@@ -506,7 +485,7 @@ export default function FloatingApp({
     setActiveIndex(getActive());
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [settings.autoHighlightActive, visible, headings]);
+  }, [settings.autoHighlightActive, settings.scrollPosition, visible, headings]);
 
   // --- Drag logic ---
   const handleDragStart = useCallback(

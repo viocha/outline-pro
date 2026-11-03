@@ -73,6 +73,8 @@ export interface Settings {
   highlightOpacity: 10 | 20 | 30 | 40 | 50;
   /** 非叶子节点点击空白处时是否跳转到标题 */
   nonLeafBlankAreaJump: boolean;
+  /** 点击大纲后标题在可视区域中的位置 */
+  scrollPosition: 'top' | 'fifth' | 'quarter' | 'center';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -80,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 13,
   highlightOpacity: 30,
   nonLeafBlankAreaJump: false,
+  scrollPosition: 'top',
 };
 
 export const SETTINGS_KEY = 'outline_pro_settings';

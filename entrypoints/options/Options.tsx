@@ -7,6 +7,7 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DEFAULT_SETTINGS, SETTINGS_KEY, loadSettings, updateSettings, type Settings } from '@/lib/types';
 
@@ -147,7 +148,26 @@ export default function Options() {
               <CardTitle role="heading" aria-level={2}>导航</CardTitle>
             </CardHeader>
             <CardContent>
-              <FieldGroup>
+              <FieldGroup className="gap-3">
+                <Field orientation="horizontal">
+                  <FieldLabel id="scroll-position-label">跳转位置</FieldLabel>
+                  <ToggleGroup
+                    variant="outline"
+                    spacing={0}
+                    aria-labelledby="scroll-position-label"
+                    value={[settings.scrollPosition]}
+                    disabled={pending}
+                    onValueChange={values => {
+                      const value = values[0];
+                      if (value === 'top' || value === 'fifth' || value === 'quarter' || value === 'center') void update({ scrollPosition: value });
+                    }}
+                  >
+                    <ToggleGroupItem value="top" className="font-normal">顶部</ToggleGroupItem>
+                    <ToggleGroupItem value="fifth" className="font-normal">1/5</ToggleGroupItem>
+                    <ToggleGroupItem value="quarter" className="font-normal">1/4</ToggleGroupItem>
+                    <ToggleGroupItem value="center" className="font-normal">中间</ToggleGroupItem>
+                  </ToggleGroup>
+                </Field>
                 <SwitchField
                   id="blank-jump"
                   label="点击空白跳转"
